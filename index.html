@@ -543,22 +543,170 @@
       to   { opacity: 1; transform: none; }
     }
  
-    /* RESPONSIVE */
+    /* RESPONSIVE - Tablet (900px and below) */
     @media (max-width: 900px) {
-      nav { padding: 16px 24px; }
-      .nav-links { gap: 16px; }
-      #hero { grid-template-columns: 1fr; padding: 100px 24px 60px; gap: 40px; }
-      #hero::after { display: none; }
-      .hero-right { grid-template-columns: 1fr 1fr; }
-      section { padding: 64px 24px; }
-      #about .about-grid { grid-template-columns: 1fr; }
+      nav { padding: 14px 20px; }
+      .nav-links { gap: 16px; font-size: 10px; }
+      .nav-logo { font-size: 18px; }
+      #hero { grid-template-columns: 1fr; padding: 80px 20px 60px; gap: 40px; }
+      #hero::before { background-size: 32px 32px; }
+      .hero-right { grid-template-columns: 1fr 1fr; gap: 12px; }
+      .stat-card { padding: 20px 16px; }
+      .stat-num { font-size: 36px; }
+      .stat-label { font-size: 9px; }
+      section { padding: 60px 20px; }
+      .section-header { margin-bottom: 40px; }
+      .section-title { font-size: clamp(28px, 4vw, 48px); }
+      #about .about-grid { grid-template-columns: 1fr; gap: 32px; }
+      .about-text { font-size: 16px; }
+      .interest-tag { font-size: 10px; padding: 5px 10px; margin: 3px; }
       .edu-item { grid-template-columns: 1fr; gap: 8px; }
+      .edu-school { font-size: 22px; }
       .coaching-item { grid-template-columns: 1fr; gap: 16px; }
+      .coaching-org { font-size: 18px; }
+      .coaching-points li { font-size: 12px; padding-left: 16px; }
       .projects-grid { grid-template-columns: 1fr; }
-      #skills .skills-wrapper { grid-template-columns: 1fr; }
-      #contact .contact-inner { grid-template-columns: 1fr; gap: 40px; }
-      footer { flex-direction: column; gap: 10px; text-align: center; }
+      .project-title { font-size: 22px; }
+      .project-desc { font-size: 11px; }
+      #skills .skills-wrapper { grid-template-columns: 1fr; gap: 32px; }
+      .skill-group-title { font-size: 16px; }
+      .skill-pill { font-size: 11px; padding: 6px 12px; margin: 4px 3px; }
+      .lang-card { min-width: 120px; padding: 18px 24px; }
+      .lang-name { font-size: 20px; }
+      #contact .contact-inner { grid-template-columns: 1fr; gap: 32px; }
+      .contact-headline { font-size: clamp(32px, 4vw, 56px); }
+      .contact-links { gap: 12px; }
+      .contact-link { padding: 12px 16px; font-size: 11px; gap: 10px; }
+      .contact-link-value { font-size: 13px; }
+      footer { flex-direction: column; gap: 8px; text-align: center; font-size: 9px; padding: 24px 20px; }
     }
+
+    /* RESPONSIVE - Mobile (768px and below) */
+    @media (max-width: 768px) {
+      nav { padding: 12px 16px; }
+      .nav-logo { font-size: 16px; }
+      .nav-links { gap: 12px; font-size: 9px; }
+      .theme-toggle { padding: 5px 10px; font-size: 9px; }
+      #hero { padding: 70px 16px 50px; gap: 30px; }
+      #hero::before { background-size: 24px 24px; opacity: 0.2; }
+      .hero-tag { font-size: 9px; padding: 3px 10px; margin-bottom: 16px; }
+      .hero-name { font-size: clamp(48px, 6vw, 80px); }
+      .hero-subtitle { font-size: 16px; margin-bottom: 20px; }
+      .hero-bio { font-size: 12px; max-width: 100%; }
+      .hero-cta { flex-direction: column; gap: 12px; }
+      .btn-primary, .btn-secondary { width: 100%; text-align: center; padding: 11px 20px; font-size: 10px; }
+      .hero-right { grid-template-columns: 1fr; gap: 12px; }
+      .stat-card { padding: 18px 14px; }
+      .stat-num { font-size: 32px; }
+      .stat-label { font-size: 8px; }
+      section { padding: 50px 16px; }
+      .section-num { font-size: 12px; }
+      .section-title { font-size: clamp(24px, 3.5vw, 40px); }
+      .section-header { margin-bottom: 30px; gap: 12px; }
+      .section-line { display: none; }
+      #about .about-grid { gap: 24px; }
+      .about-text { font-size: 14px; line-height: 1.6; }
+      .about-interests { margin-top: 20px; }
+      .interest-tag { font-size: 9px; padding: 4px 8px; margin: 2px; }
+      .edu-item { padding: 24px 0; }
+      .edu-year { font-size: 10px; }
+      .edu-school { font-size: 18px; }
+      .edu-degree { font-size: 11px; }
+      .medals-grid { grid-template-columns: 1fr; gap: 16px; }
+      .medal-card { padding: 20px; min-height: 160px; }
+      .medal-badge { font-size: 10px; padding: 2px 8px; margin-bottom: 10px; }
+      .medal-comp { font-size: 15px; }
+      .medal-details { font-size: 10px; }
+      .coaching-item { padding: 30px 0; }
+      .coaching-org { font-size: 16px; }
+      .coaching-role { font-size: 10px; }
+      .coaching-period { font-size: 10px; }
+      .coaching-points li { font-size: 11px; padding: 6px 0; padding-left: 14px; }
+      .projects-grid { gap: 16px; }
+      .project-years { font-size: 9px; }
+      .project-title { font-size: 19px; margin-bottom: 8px; }
+      .project-desc { font-size: 11px; line-height: 1.6; }
+      #skills .skills-wrapper { gap: 24px; }
+      .skill-group-title { font-size: 14px; margin-bottom: 12px; }
+      .skill-pill { font-size: 10px; padding: 5px 10px; margin: 3px 2px; }
+      .lang-grid { gap: 12px; }
+      .lang-card { min-width: 100px; padding: 16px 20px; }
+      .lang-name { font-size: 18px; }
+      .lang-level { font-size: 9px; }
+      #contact .contact-inner { gap: 24px; }
+      .contact-headline { font-size: clamp(28px, 3.5vw, 48px); margin-bottom: 16px; line-height: 0.95; }
+      .contact-sub { font-size: 12px; line-height: 1.7; }
+      .contact-links { gap: 10px; }
+      .contact-link { padding: 10px 14px; font-size: 10px; }
+      .contact-link-icon { font-size: 14px; }
+      .contact-link-label { font-size: 9px; }
+      .contact-link-value { font-size: 12px; }
+      footer { padding: 20px 16px; gap: 6px; font-size: 8px; }
+    }
+
+    /* RESPONSIVE - Small Mobile (480px and below) */
+    @media (max-width: 480px) {
+      nav { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+      .nav-logo { font-size: 14px; letter-spacing: 0.1em; }
+      .nav-links { gap: 8px; font-size: 8px; }
+      .nav-links a { letter-spacing: 0.08em; }
+      .theme-toggle { padding: 4px 8px; font-size: 8px; }
+      #hero { padding: 60px 12px 40px; gap: 24px; margin-top: 20px; }
+      #hero::before { background-size: 20px 20px; opacity: 0.15; }
+      .hero-tag { font-size: 8px; padding: 2px 8px; margin-bottom: 12px; letter-spacing: 0.1em; }
+      .hero-name { font-size: clamp(36px, 5vw, 60px); margin-bottom: 12px; }
+      .hero-subtitle { font-size: 14px; margin-bottom: 16px; }
+      .hero-bio { font-size: 11px; line-height: 1.6; }
+      .hero-cta { flex-direction: column; gap: 10px; margin-top: 24px; }
+      .btn-primary, .btn-secondary { padding: 10px 16px; font-size: 9px; }
+      .hero-right { gap: 10px; }
+      .stat-card { padding: 14px 12px; }
+      .stat-num { font-size: 28px; }
+      .stat-label { font-size: 7px; letter-spacing: 0.12em; margin-top: 4px; }
+      section { padding: 40px 12px; }
+      .section-num { font-size: 11px; }
+      .section-title { font-size: clamp(20px, 3vw, 32px; }
+      .section-header { margin-bottom: 24px; gap: 8px; flex-wrap: wrap; }
+      #about .about-grid { gap: 18px; }
+      .about-text { font-size: 13px; }
+      .interest-tag { font-size: 8px; padding: 3px 6px; margin: 2px 1px; }
+      .edu-item { padding: 18px 0; }
+      .edu-year { font-size: 9px; }
+      .edu-school { font-size: 16px; }
+      .edu-degree { font-size: 10px; }
+      .medals-grid { grid-template-columns: 1fr; gap: 12px; }
+      .medal-card { padding: 16px; min-height: 140px; }
+      .medal-badge { font-size: 9px; padding: 2px 6px; }
+      .medal-comp { font-size: 13px; }
+      .medal-details { font-size: 9px; }
+      .coaching-item { padding: 24px 0; }
+      .coaching-org { font-size: 14px; letter-spacing: 0.04em; }
+      .coaching-role { font-size: 9px; }
+      .coaching-period { font-size: 9px; }
+      .coaching-points li { font-size: 10px; padding: 5px 0; padding-left: 12px; }
+      .coaching-points li::before { left: -2px; }
+      .projects-grid { gap: 12px; }
+      .project-years { font-size: 8px; }
+      .project-title { font-size: 16px; }
+      .project-desc { font-size: 10px; }
+      #skills .skills-wrapper { gap: 18px; }
+      .skill-group-title { font-size: 12px; margin-bottom: 10px; }
+      .skill-pill { font-size: 9px; padding: 4px 8px; margin: 2px 1px; }
+      .lang-grid { gap: 8px; }
+      .lang-card { min-width: 80px; padding: 12px 16px; }
+      .lang-name { font-size: 16px; }
+      .lang-level { font-size: 8px; }
+      #contact .contact-inner { gap: 16px; }
+      .contact-headline { font-size: clamp(24px, 3vw, 40px); margin-bottom: 12px; }
+      .contact-sub { font-size: 11px; line-height: 1.6; }
+      .contact-links { gap: 8px; }
+      .contact-link { padding: 8px 12px; font-size: 9px; gap: 8px; }
+      .contact-link-icon { font-size: 13px; width: 20px; }
+      .contact-link-label { font-size: 8px; }
+      .contact-link-value { font-size: 11px; }
+      footer { padding: 16px 12px; gap: 4px; font-size: 7px; }
+    }
+  </style>
   </style>
 </head>
 <body>
