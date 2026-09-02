@@ -23,7 +23,7 @@ src/
 ```
 
 Two decisions worth knowing about:
-
+```
 **The engine is not a React component.** It owns the canvas and runs its own
 `requestAnimationFrame` loop, and talks to React through four callbacks
 (`onHud`, `onPrompt`, `onTalk`, `onSigil`). Nothing at 60fps touches
@@ -35,8 +35,9 @@ moved DOM nodes out of the page and into the world's panel, then put them
 back. Here each section is a component (`AboutBody`, `ProjectsBody`, …)
 rendered in both places. Same result, no DOM surgery.
 
+```
 ## Progress
-
+```
 Met characters and collected sigils persist in `localStorage` under
 `aam_world`; the theme under `aam_theme`. Every read and write is wrapped
 in `try`/`catch`, so private windows and blocked storage degrade to a fresh
