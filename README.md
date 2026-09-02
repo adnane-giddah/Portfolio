@@ -1,16 +1,9 @@
 # Ahmed Adnane Meddah — portfolio (React + TypeScript)
 
 A port of the original single-file `index.html` to Vite + React 18 + TypeScript,
-with the three-floor platformer intact.
+with three-floor platformer intact.
 
-## Running it
 
-```bash
-npm install
-npm run dev        # http://localhost:5173
-npm run build      # typecheck, then build to dist/
-npm run preview    # serve the built dist/
-npm test           # engine physics + full app mount
 ```
 
 ## How it is put together
@@ -42,13 +35,6 @@ moved DOM nodes out of the page and into the world's panel, then put them
 back. Here each section is a component (`AboutBody`, `ProjectsBody`, …)
 rendered in both places. Same result, no DOM surgery.
 
-## The cursor
-
-The original set `body { cursor: none }` and drew a small orange dot in its
-place, which is why the pointer looked invisible. That is gone: the real
-system cursor is always visible, and the orange ring is now a hollow accent
-that trails it. On touch devices the ring is not rendered at all.
-
 ## Progress
 
 Met characters and collected sigils persist in `localStorage` under
@@ -56,10 +42,6 @@ Met characters and collected sigils persist in `localStorage` under
 in `try`/`catch`, so private windows and blocked storage degrade to a fresh
 start rather than a broken page.
 
-## Deploying
 
-`vite.config.ts` sets `base: './'`, so `dist/` works from any path —
-including a project subfolder on GitHub Pages. Build, then publish `dist/`.
 
-Replace `public/cv.pdf` with the real CV, and swap `src/assets/shot.ts`
-(currently an inline placeholder SVG) for a real screenshot.
+
