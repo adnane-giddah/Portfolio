@@ -119,7 +119,7 @@
   background:var(--orange); color:var(--on-orange);
   padding:11px 18px; font-family:'DM Mono',monospace; font-size:10px;
   letter-spacing:.16em; text-transform:uppercase;
-  box-shadow:0 14px 40px rgba(255,92,0,.35);
+  box-shadow:0 14px 40px rgba(249,219,8,.35);
   animation:toastIn .45s cubic-bezier(.2,.9,.3,1.2);
 }
 .toast.out{ animation:toastOut .4s ease forwards; }
@@ -183,7 +183,7 @@ body.arc-open #cursor{ z-index:12500; }
   background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.09);
   display:flex; align-items:center; padding:0 7px; gap:4px;
 }
-.mm-row.here{ border-color:var(--orange); background:rgba(255,92,0,.1); }
+.mm-row.here{ border-color:var(--orange); background:rgba(249,219,8,.1); }
 .mm-n{
   font-family:'DM Mono',monospace; font-size:7px; letter-spacing:.14em;
   color:#5E5E६A; color:#5E5E6A; margin-right:2px;
@@ -220,7 +220,7 @@ body.arc-open #cursor{ z-index:12500; }
   z-index:3; pointer-events:none; opacity:0; transition:.22s cubic-bezier(.2,.8,.3,1.2);
   display:flex; align-items:center; gap:11px;
   background:rgba(10,8,16,.9); border:1px solid var(--orange);
-  padding:10px 18px; box-shadow:0 12px 40px rgba(255,92,0,.2); white-space:nowrap;
+  padding:10px 18px; box-shadow:0 12px 40px rgba(249,219,8,.2); white-space:nowrap;
 }
 .arc-prompt.on{ opacity:1; transform:translateX(-50%) translateY(0); }
 .ap-glyph{
@@ -239,7 +239,7 @@ body.arc-open #cursor{ z-index:12500; }
   position:absolute; left:50%; bottom:0; transform:translateX(-50%) translateY(102%);
   width:min(720px,94%); z-index:7;
   background:linear-gradient(160deg,#12101C,#0A0910);
-  border:1px solid rgba(255,92,0,.45); border-bottom:none;
+  border:1px solid rgba(249,219,8,.45); border-bottom:none;
   padding:22px 24px; display:flex; gap:18px;
   box-shadow:0 -20px 60px rgba(0,0,0,.6);
   transition:transform .34s cubic-bezier(.2,.8,.3,1);
@@ -247,9 +247,9 @@ body.arc-open #cursor{ z-index:12500; }
 .arc-dlg.on{ transform:translateX(-50%) translateY(0); }
 .dlg-av{
   width:64px; height:64px; flex:none; display:grid; place-items:center;
-  border:1px solid rgba(255,92,0,.4); background:rgba(255,92,0,.07);
+  border:1px solid rgba(249,219,8,.4); background:rgba(249,219,8,.07);
   font-family:'Instrument Serif',serif; font-style:italic; font-size:32px;
-  color:var(--orange); text-shadow:0 0 18px rgba(255,92,0,.6);
+  color:var(--orange); text-shadow:0 0 18px rgba(249,219,8,.6);
 }
 .dlg-main{ flex:1; min-width:0; }
 .dlg-name{
@@ -366,7 +366,7 @@ body.arc-open #cursor{ z-index:12500; }
   user-select:none; -webkit-user-select:none;
   display:inline-flex; align-items:center; justify-content:center; gap:7px;
   min-height:62px; padding:0 18px; border-radius:14px;
-  background:rgba(14,16,26,.82); border:1.5px solid rgba(255,92,0,.5);
+  background:rgba(14,16,26,.82); border:1.5px solid rgba(249,219,8,.5);
   color:#FFB88A; font-family:'DM Mono',monospace; font-size:11px; font-weight:500;
   letter-spacing:.12em; text-transform:uppercase; cursor:pointer;
   transition:transform .08s ease, background .12s ease, color .12s ease, box-shadow .12s ease;
@@ -374,7 +374,7 @@ body.arc-open #cursor{ z-index:12500; }
 .pad-b .pb-ar{ font-size:16px; line-height:1; color:var(--orange); }
 .pad-b.down{
   background:var(--orange); color:#0A0A0A; border-color:var(--orange);
-  transform:scale(.94); box-shadow:0 0 28px rgba(255,92,0,.55);
+  transform:scale(.94); box-shadow:0 0 28px rgba(249,219,8,.55);
 }
 .pad-b.down .pb-ar{ color:#0A0A0A; }
 .pad-jump{ min-width:74px; padding:0 14px; font-size:10px; }
@@ -438,7 +438,7 @@ nav.nav-open .nav-burger span:nth-child(3){ transform:translateY(-6px) rotate(-4
 
 @media (max-width: 860px){
   nav{ padding:10px 16px; }
-  .nav-logo{ font-size:19px; letter-spacing:.12em; }
+  .nav-logo img{ width:30px; height:30px; }
   .nav-burger{ display:flex; }
 
   /* the links become a panel hanging off the fixed bar */
@@ -547,6 +547,6 @@ section[id]{ scroll-margin-top:86px; }
   body{ cursor:auto; }
   #cursor{ display:none !important; }
   .theme-toggle,.nav-burger,button,a{ cursor:pointer; }
-  a,button{ -webkit-tap-highlight-color:rgba(255,92,0,.16); }
+  a,button{ -webkit-tap-highlight-color:rgba(249,219,8,.16); }
   .stat-card:hover,.medal-card:hover,.project-card:hover{ transform:none; }
 }

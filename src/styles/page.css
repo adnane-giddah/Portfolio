@@ -1,14 +1,14 @@
 :root {
-  --orange:   #FF5C00;
-  --orange-dim: #C44400;
-  --orange-glow: rgba(255, 92, 0, 0.18);
+  --orange:   #F9DB08;
+  --orange-dim: #B39E06;
+  --orange-glow: rgba(249, 219, 8, 0.18);
   --bg:       #0A0A0A;
   --surface:  #111111;
   --surface2: #1A1A1A;
   --border:   #222222;
   --text:     #E8E0D8;
   --muted:    #666666;
-  --on-orange:#0A0A0A;
+  --on-orange:#111416;
   --skill-light:   #00D9FF33;
   --skill-medium:  #00A8CC;
   --skill-dark:    #0066FF;
@@ -20,8 +20,8 @@
   --border:   #D0C8BF;
   --text:     #1A1510;
   --muted:    #888078;
-  --on-orange:#FFFFFF;
-  --orange-glow: rgba(255, 92, 0, 0.10);
+  --on-orange:#111416;
+  --orange-glow: rgba(249, 219, 8, 0.10);
   --skill-light:   #3366FF33;
   --skill-medium:  #1E52B8;
   --skill-dark:    #0033AA;
@@ -71,11 +71,14 @@ nav {
   backdrop-filter: blur(12px);
 }
 .nav-logo {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: var(--orange);
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+.nav-logo img {
+  display: block;
+  width: 36px;
+  height: 36px;
 }
 .nav-links { display: flex; gap: 32px; align-items: center; }
 .nav-links a {
@@ -539,7 +542,7 @@ footer span { color: var(--orange); }
 @media (max-width: 900px) {
   nav { padding: 14px 20px; }
   .nav-links { gap: 16px; font-size: 10px; }
-  .nav-logo { font-size: 18px; }
+  .nav-logo img { width: 30px; height: 30px; }
   #hero { grid-template-columns: 1fr; padding: 80px 20px 60px; gap: 40px; }
   #hero::before { background-size: 32px 32px; }
   .hero-right { grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -576,7 +579,7 @@ footer span { color: var(--orange); }
 /* RESPONSIVE - Mobile (768px and below) */
 @media (max-width: 768px) {
   nav { padding: 12px 16px; }
-  .nav-logo { font-size: 16px; }
+  .nav-logo img { width: 28px; height: 28px; }
   .nav-links { gap: 12px; font-size: 9px; }
   .theme-toggle { padding: 5px 10px; font-size: 9px; }
   #hero { padding: 70px 16px 50px; gap: 30px; }
@@ -639,7 +642,7 @@ footer span { color: var(--orange); }
 /* RESPONSIVE - Small Mobile (480px and below) */
 @media (max-width: 480px) {
   nav { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .nav-logo { font-size: 14px; letter-spacing: 0.1em; }
+  .nav-logo img { width: 26px; height: 26px; }
   .nav-links { gap: 8px; font-size: 8px; }
   .nav-links a { letter-spacing: 0.08em; }
   .theme-toggle { padding: 4px 8px; font-size: 8px; }

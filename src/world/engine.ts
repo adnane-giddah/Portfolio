@@ -222,7 +222,7 @@ export class WorldEngine {
       this.coyote = 0; this.buffer = 0;
       this.player.squash = 1;
       this.blip(500, 0.09, 'triangle', 0.045);
-      this.puff(this.player.x + PW / 2, this.player.y + PH, 6, '#FF5C00');
+      this.puff(this.player.x + PW / 2, this.player.y + PH, 6, '#F9DB08');
     } else {
       this.buffer = 0.18;
     }
@@ -532,14 +532,14 @@ export class WorldEngine {
 
     c.save();
     c.beginPath(); c.rect(F.x0 - 60, gy, F.x1 - F.x0 + 120, 150); c.clip();
-    c.strokeStyle = 'rgba(255,92,0,0.06)'; c.lineWidth = 2;
+    c.strokeStyle = 'rgba(249,219,8,0.06)'; c.lineWidth = 2;
     c.beginPath();
     for (let hx = F.x0 - 120; hx < F.x1 + 140; hx += 26) { c.moveTo(hx, gy + 150); c.lineTo(hx + 70, gy); }
     c.stroke();
     c.restore();
 
-    c.shadowColor = '#FF5C00'; c.shadowBlur = 18;
-    c.fillStyle = '#FF5C00';
+    c.shadowColor = '#F9DB08'; c.shadowBlur = 18;
+    c.fillStyle = '#F9DB08';
     c.fillRect(F.x0 - 60, gy - 3, F.x1 - F.x0 + 120, 3.5);
     c.shadowBlur = 0;
 
@@ -548,7 +548,7 @@ export class WorldEngine {
     for (let rx = F.x0; rx < F.x1; rx += 220) { c.moveTo(rx, gy + 150); c.lineTo(rx, gy + 380 - 6); }
     c.stroke();
 
-    c.fillStyle = 'rgba(255,92,0,0.5)';
+    c.fillStyle = 'rgba(249,219,8,0.5)';
     c.font = '600 11px "DM Mono", monospace';
     c.textAlign = 'left'; c.textBaseline = 'alphabetic';
     c.fillText('FLOOR ' + (f + 1) + ' — ' + F.name, F.x0 + 74, gy + 34);
@@ -610,22 +610,22 @@ export class WorldEngine {
     c.quadraticCurveTo(CAVE.x + 20, gy - 246, cx + 10, gy - 252);
     c.quadraticCurveTo(CAVE.x + CAVE.w + 120, gy - 236, CAVE.x + CAVE.w + 180, gy);
     c.closePath(); c.fill();
-    c.strokeStyle = 'rgba(255,92,0,0.3)'; c.lineWidth = 2; c.stroke();
+    c.strokeStyle = 'rgba(249,219,8,0.3)'; c.lineWidth = 2; c.stroke();
 
     const mg = c.createRadialGradient(cx, gy - 56, 4, cx, gy - 56, 135);
-    mg.addColorStop(0, '#FF7A22'); mg.addColorStop(0.28, '#3A1200'); mg.addColorStop(1, '#050208');
+    mg.addColorStop(0, '#FBE446'); mg.addColorStop(0.28, '#3A1200'); mg.addColorStop(1, '#050208');
     c.fillStyle = mg;
     c.beginPath();
     c.moveTo(cx - 78, gy); c.lineTo(cx - 78, gy - 92);
     c.quadraticCurveTo(cx, gy - 196, cx + 78, gy - 92);
     c.lineTo(cx + 78, gy);
     c.closePath(); c.fill();
-    c.strokeStyle = '#FF5C00'; c.lineWidth = 2.5;
-    c.shadowColor = '#FF5C00'; c.shadowBlur = 18 + Math.sin(this.t * 3) * 7;
+    c.strokeStyle = '#F9DB08'; c.lineWidth = 2.5;
+    c.shadowColor = '#F9DB08'; c.shadowBlur = 18 + Math.sin(this.t * 3) * 7;
     c.stroke(); c.shadowBlur = 0;
 
     c.textAlign = 'center';
-    c.fillStyle = '#FF5C00'; c.font = '600 12px "DM Mono", monospace';
+    c.fillStyle = '#F9DB08'; c.font = '600 12px "DM Mono", monospace';
     c.fillText('THE CAVE', cx, gy - 228);
     c.fillStyle = 'rgba(232,224,216,0.5)'; c.font = '9px "DM Mono", monospace';
     c.fillText('the archivist keeps the CV', cx, gy - 212);
@@ -745,10 +745,10 @@ export class WorldEngine {
     const bob = Math.sin(this.t * 1.6 + n.x) * 3.5;
     const isNear = this.near !== null && 'id' in this.near && this.near.id === n.id;
     const seen = !!this.found[n.id];
-    const col = seen ? '#00D9FF' : '#FF5C00';
+    const col = seen ? '#00D9FF' : '#F9DB08';
 
     const pg = c.createRadialGradient(n.x, gy, 2, n.x, gy, 92);
-    pg.addColorStop(0, seen ? 'rgba(0,217,255,0.18)' : 'rgba(255,92,0,0.2)');
+    pg.addColorStop(0, seen ? 'rgba(0,217,255,0.18)' : 'rgba(249,219,8,0.2)');
     pg.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = pg;
     c.beginPath(); c.ellipse(n.x, gy, 92, 26, 0, 0, Math.PI * 2); c.fill();
@@ -869,7 +869,7 @@ export class WorldEngine {
     for (let ti = 0; ti < this.trail.length; ti++) {
       const tr = this.trail[ti];
       c.globalAlpha = (ti / this.trail.length) * 0.4 * Math.max(0, 1 - tr.t * 1.6);
-      c.fillStyle = '#FF5C00';
+      c.fillStyle = '#F9DB08';
       c.beginPath();
       c.arc(tr.x, tr.y, 3 + (ti / this.trail.length) * 6, 0, Math.PI * 2);
       c.fill();
@@ -882,14 +882,14 @@ export class WorldEngine {
     c.rotate(this.player.rot);
     c.scale(1 + this.player.squash * 0.24, 1 - this.player.squash * 0.26);
     const au = c.createRadialGradient(0, 0, 2, 0, 0, 58);
-    au.addColorStop(0, 'rgba(255,92,0,0.40)');
-    au.addColorStop(0.45, 'rgba(255,92,0,0.12)');
-    au.addColorStop(1, 'rgba(255,92,0,0)');
+    au.addColorStop(0, 'rgba(249,219,8,0.40)');
+    au.addColorStop(0.45, 'rgba(249,219,8,0.12)');
+    au.addColorStop(1, 'rgba(249,219,8,0)');
     c.fillStyle = au;
     c.beginPath(); c.arc(0, 0, 58, 0, Math.PI * 2); c.fill();
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.font = 'italic 72px "Instrument Serif", Georgia, serif';
-    c.shadowColor = '#FF5C00'; c.shadowBlur = 32; c.fillStyle = '#FF7A22'; c.fillText('e', 0, 2);
+    c.shadowColor = '#F9DB08'; c.shadowBlur = 32; c.fillStyle = '#FBE446'; c.fillText('e', 0, 2);
     c.shadowBlur = 17; c.fillStyle = '#FFC48A'; c.fillText('e', 0, 2);
     c.shadowBlur = 7; c.fillStyle = '#FFF3E6'; c.fillText('e', 0, 2);
     c.shadowBlur = 0;

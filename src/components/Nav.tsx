@@ -53,7 +53,9 @@ export function Nav({ onToggleTheme, forceClose }: Props) {
 
   return (
     <nav ref={barRef} className={open ? 'nav-open' : undefined}>
-      <div className="nav-logo">AAM</div>
+      <a href="#hero" className="nav-logo" aria-label="Home">
+        <img src="/logo-mark.svg" alt="" width="36" height="36" />
+      </a>
 
       <button
         className="nav-burger"
