@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/** Subscribes to a media query and re-renders when it flips. */
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -19,7 +18,6 @@ export function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/** True only where there is a real mouse to draw an accent ring for. */
 export function useFinePointer(): boolean {
   return useMediaQuery('(hover: hover) and (pointer: fine)');
 }

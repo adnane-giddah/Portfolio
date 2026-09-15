@@ -11,10 +11,6 @@ interface Props {
   onSkip: (id: GatedId) => void;
 }
 
-/**
- * A section that stays blurred until you have met its character. The lock
- * card always offers a way past it — the game is never the only route.
- */
 export function GatedSection({ id, unlocked, children, onFind, onSkip }: Props) {
   const g = GATED[id];
 

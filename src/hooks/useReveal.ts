@@ -1,9 +1,5 @@
 import { useEffect, useRef } from 'react';
 
-/**
- * Adds .visible when the element scrolls into view, matching the original
- * scroll-reveal. Falls back to visible-immediately where IO is missing.
- */
 export function useReveal<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
 

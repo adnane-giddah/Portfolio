@@ -1,17 +1,10 @@
-/* ---------------------------------------------------------------
-   The page's sections.
-
-   Each one is a plain component so it can be rendered twice: once on
-   the landing page, and once inside the world's content panel when you
-   open it from a character. The original moved DOM nodes around by
-   hand to achieve that — this is the same idea without the surgery.
-   --------------------------------------------------------------- */
 
 import {
   ABOUT_INTERESTS, COACHING, CONTACT_LINKS, EDUCATION, LANGUAGES,
   MEDALS, PROJECTS, SKILL_GROUPS,
 } from '../data/profile';
 import { useReveal } from '../hooks/useReveal';
+import { ProjectMedia } from './ProjectMedia';
 
 export function AboutBody() {
   const ref = useReveal<HTMLDivElement>();
@@ -27,7 +20,8 @@ export function AboutBody() {
           <br />
           Beyond the classroom, I coach national and international olympiad teams, deliver lectures
           across Africa, and build academic communities that have produced top-scoring baccalaureate
-          students in Algeria.
+          students in Algeria. I have also worked hands-on with networking and server infrastructure,
+          interning in switch, VLAN, and firewall administration and Proxmox virtualization.
         </p>
       </div>
       <div className="about-interests">
@@ -61,6 +55,7 @@ export function EducationBody() {
           <div>
             <div className="edu-school">{e.school}</div>
             <div className="edu-degree">{e.degree}</div>
+            <div className="edu-detail">{e.detail}</div>
           </div>
         </div>
       ))}
@@ -103,7 +98,7 @@ export function CoachingBody() {
   return (
     <div className="reveal" ref={ref}>
       {COACHING.map((c) => (
-        <div className="coaching-item" key={c.org}>
+        <div className="coaching-item" key={c.org + c.role}>
           <div className="coaching-meta">
             <div className="coaching-org">{c.org}</div>
             <div className="coaching-role">{c.role}</div>
@@ -125,11 +120,17 @@ export function ProjectsBody() {
   return (
     <div className="projects-grid reveal" ref={ref}>
       {PROJECTS.map((p) => (
-        <a key={p.title} href={p.href} className="project-card" style={{ textDecoration: 'none' }}>
-          <div className="project-years">{p.years}</div>
-          <div className="project-title">{p.title}</div>
-          <p className="project-desc">{p.desc}</p>
-        </a>
+        <div key={p.title} className="project-card">
+          {p.images && <ProjectMedia images={p.images} alt={p.title} />}
+          <div className="project-card-body">
+            <div className="project-years">
+              {p.years}
+              {p.role && ' · ' + p.role}
+            </div>
+            <div className="project-title">{p.title}</div>
+            <p className="project-desc">{p.desc}</p>
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -206,13 +207,12 @@ export function ContactBody() {
   );
 }
 
-/** The Archivist's vault, shown inside the world panel. */
 export function CvVaultBody({ href }: { href: string }) {
   return (
     <div id="cvVault" className="in-panel">
       <div className="vault-inner">
         <div className="vault-e">e</div>
-        <div className="vault-kicker">The Archive · deepest room of the cave</div>
+        <div className="vault-kicker">The Archive · kept by the Archivist</div>
         <h2 className="vault-h">The Curriculum Vitae</h2>
         <p className="vault-p">
           Everything on this site, folded into two pages: the degrees, the medals, the coaching

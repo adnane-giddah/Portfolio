@@ -1,18 +1,16 @@
-/* ---------------------------------------------------------------
-   The world engine.
 
-   Deliberately framework-free: it owns a canvas, a physics step and a
-   draw pass, and reports outwards through callbacks. React mounts it,
-   listens, and renders the DOM overlay. Nothing in here imports React,
-   which keeps the 60fps loop away from the render cycle entirely.
-   --------------------------------------------------------------- */
 
 import {
-  BPADS, CAVE, CRATES, FLOORS, LIFTS, MOVERS, NPCS, PLATS, SIGILS,
+  BPADS, CRATES, FLOORS, LIFTS, MOVERS, NPCS, PLATS, SIGILS,
 } from '../data/world';
 import type { BouncePad, Crate, Mover, Npc, PromptState, Sigil } from '../types';
 
-/* ---- tuning ---- */
+
+const INK = '#E8E0D8';
+const ACCENT = '#F9DB08';
+const ACCENT_DIM = '#B39E06';
+
+
 const RUN = 300;
 const ACC = 2300;
 const FRIC = 2600;
@@ -24,7 +22,7 @@ const BOUNCE = -1080;
 export const PW = 32;
 export const PH = 42;
 
-const SYM = ['∫', '∑', 'π', '∂', '∇', 'λ', 'θ', 'Σ', '√', '∞', 'φ', 'ε'];
+const SYM = ['e', 'i', 'π', '+', '1', '=', '0'];
 
 function rnd(s: number) {
   const x = Math.sin(s * 12.9898) * 43758.5453;
@@ -45,24 +43,83 @@ interface Mote { x: number; y: number; s: string; sc: number; a: number }
 interface Ride { from: number; to: number; x: number; t: number; dur: number }
 
 export interface EngineCallbacks {
-  /** floor / counts changed */
+
   onHud: () => void;
-  /** the "press E" bubble, or null */
+
   onPrompt: (p: PromptState | null) => void;
-  /** the player pressed E on a character */
-  onTalk: (npc: Npc) => void;
-  /** a sigil was picked up */
+
+  onEnterCave: (npc: Npc) => void;
+
+  onExitCave: () => void;
+
+  onOpenContent: (npc: Npc) => void;
+
   onSigil: (sigil: Sigil, collected: number, total: number) => void;
 }
 
-export type View = 'world' | 'dlg' | 'panel';
+export type View = 'world' | 'cave' | 'panel';
+
+const CAVE_HALF = 60;
+const CORRIDOR_LEN = 720;
+const JEWEL_X = CORRIDOR_LEN / 2;
+const JEWEL_RANGE = 46;
+
+type PxColor = 'K' | 'D' | 'M' | 'H' | 'W' | 'Y' | 'A';
+const PX_PALETTE: Record<PxColor, string> = {
+  K: '#0B0A08',
+  D: '#1E1B17',
+  M: '#34302A',
+  H: '#7A7468',
+  W: '#F2ECDD',
+  Y: '#F9DB08',
+  A: '#C9A227',
+};
+
+const PX_BODY: [number, number][][] = [
+  [[6, 7]],
+  [[5, 8]],
+  [[4, 9]],
+  [[3, 10]],
+  [[3, 10]],
+  [[2, 11]],
+  [[2, 11]],
+  [[2, 11]],
+  [[2, 11]],
+  [[1, 12]],
+  [[1, 12]],
+  [[1, 12]],
+  [[1, 12]],
+  [[1, 12]],
+  [[1, 12]],
+  [[1, 12]],
+  [[2, 11]],
+  [[2, 11]],
+  [[2, 11]],
+  [[3, 5], [8, 10]],
+  [[3, 5], [8, 10]],
+];
+const PX_EYES: [number, number][] = [[6, 4], [6, 9]];
+const PX_SASH: [number, number][] = [[9, 3], [10, 4], [11, 5], [12, 6], [13, 7], [14, 8], [15, 9]];
+const PX_ACCENT: [number, number] = [13, 7];
+const PX_BOOT_ROWS = [19, 20];
+
+const PX_LANTERN: [number, number, PxColor][] = [
+  [0, 1, 'H'],
+  [1, 0, 'Y'], [1, 1, 'A'], [1, 2, 'Y'],
+  [2, 0, 'Y'], [2, 1, 'A'], [2, 2, 'Y'],
+  [3, 0, 'Y'], [3, 1, 'A'], [3, 2, 'Y'],
+  [4, 1, 'Y'],
+];
+const PX_WEAPON: [number, number, PxColor][] = [
+  [0, 0, 'Y'], [1, 0, 'Y'], [1, 1, 'Y'], [2, 1, 'Y'],
+];
 
 export class WorldEngine {
   private cvs: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private cb: EngineCallbacks;
 
-  /* progress, owned by React and handed in */
+
   found: Record<string, boolean> = {};
   got: Record<string, boolean> = {};
   muted = false;
@@ -75,8 +132,8 @@ export class WorldEngine {
   private camX = 0; private camY = 0; private t = 0;
 
   player = {
-    x: 380, y: -PH, vx: 0, vy: 0, floor: 0,
-    ground: true, rot: 0, squash: 0,
+    x: 280, y: -PH, vx: 0, vy: 0, floor: 0,
+    ground: true, rot: 0, squash: 0, facing: 1,
     rideOn: null as Mover | null,
   };
   input = { left: false, right: false };
@@ -84,7 +141,9 @@ export class WorldEngine {
   private coyote = 0;
   private buffer = 0;
   private ride: Ride | null = null;
-  private near: Npc | { lift: unknown; to: number } | null = null;
+  private activeCave: Npc | null = null;
+  private caveReturn: { floor: number; x: number } | null = null;
+  private nearJewel = false;
   private parts: Particle[] = [];
   private trail: TrailDot[] = [];
   private stars: Star[] = [];
@@ -117,7 +176,7 @@ export class WorldEngine {
     }
   }
 
-  /* ------------------------------------------------------------ audio */
+
   private audio(): AudioContext | null {
     if (this.ac === null) {
       try {
@@ -155,7 +214,7 @@ export class WorldEngine {
   }
   unlockAudio() { this.audio(); }
 
-  /* ------------------------------------------------------------ setup */
+
   resize(host: HTMLElement) {
     this.W = host.clientWidth || window.innerWidth;
     this.H = host.clientHeight || window.innerHeight;
@@ -172,7 +231,7 @@ export class WorldEngine {
     this.snapCam(1);
   }
 
-  /** Drop the player in, optionally at a particular character. */
+
   spawn(seekId?: string) {
     const seek = seekId ? NPCS.find((n) => n.id === seekId) : undefined;
     if (seek) {
@@ -180,7 +239,7 @@ export class WorldEngine {
       this.player.x = clamp(seek.x - 300, FLOORS[seek.f].x0, FLOORS[seek.f].x1 - PW);
     }
     this.player.y = floorY(this.player.floor) - PH;
-    this.player.vx = 0; this.player.vy = 0;
+    this.player.vx = 0; this.player.vy = 0; this.player.facing = 1;
     this.player.ground = true; this.player.rideOn = null;
     this.ride = null;
     this.input.left = false; this.input.right = false;
@@ -200,7 +259,7 @@ export class WorldEngine {
   }
   destroy() {
     this.stop();
-    if (this.ac) { try { void this.ac.close(); } catch { /* already gone */ } }
+    if (this.ac) { try { void this.ac.close(); } catch {  } }
   }
 
   private frame = (ts: number) => {
@@ -213,9 +272,9 @@ export class WorldEngine {
     this.raf = requestAnimationFrame(this.frame);
   };
 
-  /* ------------------------------------------------------------ input */
+
   jump() {
-    if (this.view !== 'world' || this.ride) return;
+    if ((this.view !== 'world' && this.view !== 'cave') || this.ride) return;
     if (this.player.ground || this.coyote > 0) {
       this.player.vy = JUMP;
       this.player.ground = false;
@@ -231,20 +290,71 @@ export class WorldEngine {
     if (this.player.vy < -230) this.player.vy = -230;
   }
 
-  /** E — talk to whoever is here, or ride the lift you are standing in. */
+
   act() {
-    if (this.view !== 'world' || this.ride) return;
-    const n = this.npcHere();
-    if (n) { this.cb.onTalk(n); return; }
-    const L = this.liftHere();
-    if (L) {
-      this.ride = { from: this.player.floor, to: L.to, x: L.lift.x, t: 0, dur: 0.62 };
-      this.player.vx = 0; this.player.vy = 0;
-      this.sweep(300, 900, 0.5, 'sine');
+    if (this.ride) return;
+    if (this.view === 'world') {
+      const L = this.liftHere();
+      if (L) {
+        this.ride = { from: this.player.floor, to: L.to, x: L.lift.x, t: 0, dur: 0.62 };
+        this.player.vx = 0; this.player.vy = 0;
+        this.sweep(300, 900, 0.5, 'sine');
+      }
+    } else if (this.view === 'cave' && this.nearJewel) {
+      this.openContent();
     }
   }
 
-  /* ------------------------------------------------------------ queries */
+  closePanel() {
+    if (this.view !== 'panel') return;
+    this.view = 'cave';
+    this.blip(420, 0.1, 'sine', 0.04);
+  }
+
+  private openContent() {
+    if (!this.activeCave) return;
+    this.view = 'panel';
+    this.blip(660, 0.1, 'triangle', 0.05);
+    this.cb.onOpenContent(this.activeCave);
+  }
+
+  private enterCave(n: Npc) {
+    this.activeCave = n;
+    this.caveReturn = { floor: n.f, x: n.x };
+    this.view = 'cave';
+    const fromLeft = this.player.facing >= 0;
+    this.player.x = fromLeft ? 0 : CORRIDOR_LEN - PW;
+    this.player.y = -PH;
+    this.player.vx = 0; this.player.vy = 0;
+    this.player.ground = true; this.player.rideOn = null;
+    this.nearJewel = false;
+    this.showPrompt(null);
+    this.blip(520, 0.14, 'triangle', 0.05);
+    this.snapCaveCam(1);
+    this.cb.onEnterCave(n);
+  }
+
+  private exitCave(side: 'left' | 'right') {
+    const back = this.caveReturn;
+    if (!back) return;
+    this.view = 'world';
+    this.player.floor = back.floor;
+    this.player.x = clamp(
+      side === 'left' ? back.x - CAVE_HALF - 26 : back.x + CAVE_HALF + 26,
+      FLOORS[back.floor].x0, FLOORS[back.floor].x1 - PW,
+    );
+    this.player.y = floorY(back.floor) - PH;
+    this.player.vx = 0; this.player.vy = 0;
+    this.player.ground = true; this.player.rideOn = null;
+    this.player.facing = side === 'left' ? -1 : 1;
+    this.blip(420, 0.1, 'sine', 0.04);
+    this.activeCave = null;
+    this.caveReturn = null;
+    this.snapCam(1);
+    this.cb.onExitCave();
+  }
+
+
   private puff(x: number, y: number, n: number, c: string) {
     for (let i = 0; i < n; i++) {
       this.parts.push({
@@ -267,10 +377,13 @@ export class WorldEngine {
     return null;
   }
 
-  private npcHere(): Npc | null {
+  private caveMouthHere(): Npc | null {
+    if (!this.player.ground) return null;
     for (const n of NPCS) {
       if (n.f !== this.player.floor) continue;
-      if (Math.abs(this.player.x + PW / 2 - n.x) < 66) return n;
+      if (Math.abs(this.player.x + PW / 2 - n.x) >= CAVE_HALF) continue;
+      if (n.dy && Math.abs(this.player.y + PH - (floorY(n.f) - n.dy)) >= 34) continue;
+      return n;
     }
     return null;
   }
@@ -296,7 +409,7 @@ export class WorldEngine {
     return NPCS.filter((n) => this.found[n.id]).length;
   }
 
-  /* ------------------------------------------------------------ physics */
+
   private update(dt: number) {
     this.t += dt;
 
@@ -308,28 +421,31 @@ export class WorldEngine {
     }
     for (const q of this.trail) q.t += dt;
 
-    /* sliding ledges keep sliding even while you are talking */
+
     for (const M of MOVERS) {
       const mx = this.moverX(M);
       M.dx = M.cx === undefined ? 0 : mx - M.cx;
-      if (Math.abs(M.dx) > 14) M.dx = 0;   /* stale frame — do not fling anyone */
+      if (Math.abs(M.dx) > 14) M.dx = 0;
       M.cx = mx;
     }
 
-    if (this.view !== 'world') {
-      this.near = null;
+    if (this.view === 'panel') {
       this.showPrompt(null);
       return;
     }
+    if (this.view === 'cave') {
+      this.updateCave(dt);
+      return;
+    }
 
-    /* --- riding a lift between floors --- */
+
     if (this.ride) {
       this.ride.t += dt;
       const k = clamp(this.ride.t / this.ride.dur, 0, 1);
       const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
       this.player.x = this.ride.x - PW / 2;
       this.player.y = floorY(this.ride.from) + (floorY(this.ride.to) - floorY(this.ride.from)) * e - PH;
-      if (this.ride.t % 0.1 < dt) this.puff(this.ride.x, this.player.y + PH, 2, '#00D9FF');
+      if (this.ride.t % 0.1 < dt) this.puff(this.ride.x, this.player.y + PH, 2, INK);
       if (k >= 1) {
         this.player.floor = this.ride.to;
         this.player.ground = true;
@@ -342,7 +458,7 @@ export class WorldEngine {
       return;
     }
 
-    /* --- horizontal, entirely player driven --- */
+
     const dir = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
     if (dir !== 0) {
       this.player.vx += dir * (this.player.ground ? ACC : AIRC) * dt;
@@ -353,8 +469,9 @@ export class WorldEngine {
         : Math.min(0, this.player.vx + f);
     }
     this.player.vx = clamp(this.player.vx, -RUN, RUN);
+    if (Math.abs(this.player.vx) > 12) this.player.facing = this.player.vx > 0 ? 1 : -1;
     if (this.player.rideOn && this.player.ground) {
-      this.player.x += this.player.rideOn.dx ?? 0;   /* the ledge takes you with it */
+      this.player.x += this.player.rideOn.dx ?? 0;
     }
     const prevX = this.player.x;
     this.player.x += this.player.vx * dt;
@@ -363,11 +480,11 @@ export class WorldEngine {
     if (this.player.x < F.x0) { this.player.x = F.x0; this.player.vx = 0; }
     if (this.player.x + PW > F.x1) { this.player.x = F.x1 - PW; this.player.vx = 0; }
 
-    /* crates block you sideways — jump them or climb them */
+
     for (const C of CRATES) {
       if (C.f !== this.player.floor) continue;
       const cTop = floorY(C.f) - C.h;
-      if (this.player.y + PH <= cTop + 5) continue;   /* standing on it, or above it */
+      if (this.player.y + PH <= cTop + 5) continue;
       if (this.player.y >= floorY(C.f)) continue;
       if (prevX + PW <= C.x && this.player.x + PW > C.x) {
         this.player.x = C.x - PW; this.player.vx = 0;
@@ -376,7 +493,7 @@ export class WorldEngine {
       }
     }
 
-    /* --- vertical --- */
+
     const prevBottom = this.player.y + PH;
     this.player.vy = Math.min(MAXFALL, this.player.vy + GRAV * dt);
     this.player.y += this.player.vy * dt;
@@ -396,7 +513,7 @@ export class WorldEngine {
         this.player.y = top - PH; this.player.vy = 0; this.player.ground = true;
       }
     }
-    /* crate tops are standable too */
+
     for (const cr of CRATES) {
       if (cr.f !== this.player.floor) continue;
       const ct = floorY(cr.f) - cr.h;
@@ -405,7 +522,7 @@ export class WorldEngine {
         this.player.y = ct - PH; this.player.vy = 0; this.player.ground = true;
       }
     }
-    /* and the sliding ledges */
+
     for (const mo of MOVERS) {
       if (mo.f !== this.player.floor) continue;
       const mt = this.moverTop(mo);
@@ -416,7 +533,7 @@ export class WorldEngine {
         this.player.ground = true; this.player.rideOn = mo;
       }
     }
-    /* nothing here can kill you — if you somehow drop, you are set back down */
+
     if (this.player.y > gy + 200) {
       this.player.y = gy - PH; this.player.vy = 0; this.player.ground = true;
     }
@@ -425,10 +542,10 @@ export class WorldEngine {
       if (!wasGround) {
         this.player.squash = 1;
         this.blip(170, 0.05, 'sine', 0.028);
-        this.puff(this.player.x + PW / 2, this.player.y + PH, 4, '#FFB067');
+        this.puff(this.player.x + PW / 2, this.player.y + PH, 4, INK);
       }
       this.coyote = 0.16;
-      /* a pad on the floor throws you back up the moment you touch it */
+
       const onFloor = Math.abs(this.player.y + PH - floorY(this.player.floor)) < 2;
       const bp = onFloor ? this.padUnder() : null;
       if (bp) {
@@ -438,14 +555,14 @@ export class WorldEngine {
         this.player.squash = 1;
         bp.flash = 1;
         this.sweep(320, 880, 0.26, 'triangle');
-        this.puff(this.player.x + PW / 2, this.player.y + PH, 9, '#7A5CFF');
+        this.puff(this.player.x + PW / 2, this.player.y + PH, 9, ACCENT);
       }
     } else {
       this.coyote = Math.max(0, this.coyote - dt);
     }
     for (const b of BPADS) if (b.flash) b.flash = Math.max(0, b.flash - dt * 2.2);
 
-    /* --- sigils: walk into one and it is yours --- */
+
     for (const G of SIGILS) {
       if (G.f !== this.player.floor || this.got[G.id]) continue;
       const gx = G.x;
@@ -453,7 +570,7 @@ export class WorldEngine {
       if (Math.abs(this.player.x + PW / 2 - gx) < 30 &&
           Math.abs(this.player.y + PH / 2 - gyy) < 34) {
         this.got[G.id] = true;
-        this.puff(gx, gyy, 12, '#7A5CFF');
+        this.puff(gx, gyy, 12, ACCENT);
         this.blip(880 + this.gotCount() * 40, 0.13, 'triangle', 0.05);
         if (this.gotCount() === SIGILS.length) this.sweep(420, 1250, 0.7, 'sine');
         this.cb.onSigil(G, this.gotCount(), SIGILS.length);
@@ -477,19 +594,75 @@ export class WorldEngine {
       this.trail.shift();
     }
 
-    /* --- what is within reach --- */
-    const n = this.npcHere();
-    const L = n ? null : this.liftHere();
-    if (n) {
-      this.showPrompt({ glyph: n.glyph, text: 'Talk to ', bold: n.name, key: 'E' });
-    } else if (L) {
+
+    const mouth = this.caveMouthHere();
+    if (mouth) {
+      this.enterCave(mouth);
+      return;
+    }
+
+    const L = this.liftHere();
+    if (L) {
       this.showPrompt({ glyph: '↕', text: 'Lift to ', bold: FLOORS[L.to].name, key: 'E' });
     } else {
       this.showPrompt(null);
     }
-    this.near = n ?? L;
 
     this.snapCam(1 - Math.pow(0.001, dt));
+  }
+
+  private updateCave(dt: number) {
+    const dir = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
+    if (dir !== 0) {
+      this.player.vx += dir * (this.player.ground ? ACC : AIRC) * dt;
+    } else {
+      const f = (this.player.ground ? FRIC : AIRC * 0.6) * dt;
+      this.player.vx = this.player.vx > 0
+        ? Math.max(0, this.player.vx - f)
+        : Math.min(0, this.player.vx + f);
+    }
+    this.player.vx = clamp(this.player.vx, -RUN, RUN);
+    if (Math.abs(this.player.vx) > 12) this.player.facing = this.player.vx > 0 ? 1 : -1;
+    this.player.x += this.player.vx * dt;
+
+    const prevBottom = this.player.y + PH;
+    this.player.vy = Math.min(MAXFALL, this.player.vy + GRAV * dt);
+    this.player.y += this.player.vy * dt;
+    const wasGround = this.player.ground;
+    this.player.ground = false;
+    if (this.player.vy >= 0 && this.player.y + PH >= 0 && prevBottom <= 28) {
+      this.player.y = -PH; this.player.vy = 0; this.player.ground = true;
+    }
+    if (this.player.ground) {
+      if (!wasGround) {
+        this.player.squash = 1;
+        this.blip(170, 0.05, 'sine', 0.028);
+      }
+      this.coyote = 0.16;
+    } else {
+      this.coyote = Math.max(0, this.coyote - dt);
+    }
+    if (this.buffer > 0) {
+      this.buffer -= dt;
+      if (this.player.ground || this.coyote > 0) this.jump();
+    }
+    this.player.squash = Math.max(0, this.player.squash - dt * 4.5);
+    const want = (this.player.vx / RUN) * 0.18 +
+      (this.player.ground ? 0 : clamp(this.player.vy / 900, -1, 1) * 0.09);
+    this.player.rot += (want - this.player.rot) * Math.min(1, dt * 9);
+
+    if (this.player.x <= -30) { this.exitCave('left'); return; }
+    if (this.player.x >= CORRIDOR_LEN - PW + 30) { this.exitCave('right'); return; }
+
+    this.nearJewel = !!this.activeCave &&
+      Math.abs(this.player.x + PW / 2 - JEWEL_X) < JEWEL_RANGE && this.player.ground;
+    if (this.activeCave) {
+      this.showPrompt(this.nearJewel
+        ? { glyph: this.activeCave.glyph, text: 'Open ', bold: this.activeCave.title, key: 'E' }
+        : null);
+    }
+
+    this.snapCaveCam(1 - Math.pow(0.001, dt));
   }
 
   private showPrompt(p: PromptState | null) {
@@ -509,7 +682,15 @@ export class WorldEngine {
     else { this.camX += (tx - this.camX) * a; this.camY += (ty - this.camY) * a; }
   }
 
-  /* ------------------------------------------------------------ draw */
+  private snapCaveCam(a?: number) {
+    let tx = this.player.x + PW / 2 - this.VW * 0.5;
+    tx = clamp(tx, -100, CORRIDOR_LEN - this.VW + 100);
+    const ty = -this.VH * 0.66 + 120;
+    if (a === undefined || a >= 1) { this.camX = tx; this.camY = ty; }
+    else { this.camX += (tx - this.camX) * a; this.camY += (ty - this.camY) * a; }
+  }
+
+
   private rr(x: number, y: number, w: number, h: number, r: number) {
     const c = this.ctx;
     c.beginPath();
@@ -521,6 +702,88 @@ export class WorldEngine {
     c.closePath();
   }
 
+
+  private static readonly HEX_UNIT = Array.from({ length: 6 }, (_, i) => {
+    const a = (Math.PI / 180) * (60 * i - 90);
+    return [Math.cos(a), Math.sin(a)] as const;
+  });
+
+
+  private drawHexField(x: number, y: number, w: number, h: number, r: number, color: string, alpha: number) {
+    const c = this.ctx;
+    const unit = WorldEngine.HEX_UNIT;
+    c.save();
+    c.beginPath(); c.rect(x, y, w, h); c.clip();
+    c.strokeStyle = color;
+    c.globalAlpha = alpha;
+    c.lineWidth = 1;
+    const hSpace = r * Math.sqrt(3);
+    const vSpace = r * 1.5;
+    const rows = Math.ceil(h / vSpace) + 2;
+    const cols = Math.ceil(w / hSpace) + 2;
+    c.beginPath();
+    for (let row = -1; row < rows; row++) {
+      const cy = y + row * vSpace;
+      const offset = Math.abs(row) % 2 ? hSpace / 2 : 0;
+      for (let col = -1; col < cols; col++) {
+        const cx = x + col * hSpace + offset;
+        for (let i = 0; i < 6; i++) {
+          const px = cx + r * unit[i][0]; const py = cy + r * unit[i][1];
+          if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+        }
+        c.closePath();
+      }
+    }
+    c.stroke();
+    c.restore();
+    c.globalAlpha = 1;
+  }
+
+  private drawPixelChar(originX: number, feetY: number, px: number, outline: string, alpha: number) {
+    const c = this.ctx;
+    c.globalAlpha = alpha;
+    const width = 14;
+    const left = originX - (width / 2) * px;
+    const top = feetY - PX_BODY.length * px;
+
+    const eyeSet = new Set(PX_EYES.map(([r, cc]) => r + ',' + cc));
+    const sashSet = new Set(PX_SASH.map(([r, cc]) => r + ',' + cc));
+    const bootSet = new Set(PX_BOOT_ROWS);
+
+    for (let row = 0; row < PX_BODY.length; row++) {
+      for (const [x0, x1] of PX_BODY[row]) {
+        for (let col = x0; col <= x1; col++) {
+          const key = row + ',' + col;
+          let color: string;
+          if (row === PX_ACCENT[0] && col === PX_ACCENT[1]) color = PX_PALETTE.Y;
+          else if (eyeSet.has(key)) color = PX_PALETTE.W;
+          else if (sashSet.has(key)) color = PX_PALETTE.H;
+          else if (bootSet.has(row)) color = PX_PALETTE.K;
+          else if (col === x0 || col === x1) color = outline;
+          else color = col < width / 2 ? PX_PALETTE.D : PX_PALETTE.M;
+          c.fillStyle = color;
+          c.fillRect(left + col * px, top + row * px, px + 0.5, px + 0.5);
+        }
+      }
+    }
+
+    const lanternTop = top + 11 * px;
+    const lanternLeft = left - 4 * px;
+    for (const [row, col, colKey] of PX_LANTERN) {
+      c.fillStyle = PX_PALETTE[colKey];
+      c.fillRect(lanternLeft + col * px, lanternTop + row * px, px + 0.5, px + 0.5);
+    }
+
+    const weaponTop = top + 16 * px;
+    const weaponLeft = left + 13 * px;
+    for (const [row, col, colKey] of PX_WEAPON) {
+      c.fillStyle = PX_PALETTE[colKey];
+      c.fillRect(weaponLeft + col * px, weaponTop + row * px, px + 0.5, px + 0.5);
+    }
+
+    c.globalAlpha = 1;
+  }
+
   private drawFloorSlab(f: number) {
     const c = this.ctx;
     const F = FLOORS[f];
@@ -530,23 +793,14 @@ export class WorldEngine {
     c.fillStyle = g;
     c.fillRect(F.x0 - 60, gy, F.x1 - F.x0 + 120, 150);
 
-    c.save();
-    c.beginPath(); c.rect(F.x0 - 60, gy, F.x1 - F.x0 + 120, 150); c.clip();
-    c.strokeStyle = 'rgba(249,219,8,0.06)'; c.lineWidth = 2;
-    c.beginPath();
-    for (let hx = F.x0 - 120; hx < F.x1 + 140; hx += 26) { c.moveTo(hx, gy + 150); c.lineTo(hx + 70, gy); }
-    c.stroke();
-    c.restore();
+    this.drawHexField(F.x0 - 60, gy, F.x1 - F.x0 + 120, 150, 20, '#F9DB08', 0.08);
 
     c.shadowColor = '#F9DB08'; c.shadowBlur = 18;
     c.fillStyle = '#F9DB08';
     c.fillRect(F.x0 - 60, gy - 3, F.x1 - F.x0 + 120, 3.5);
     c.shadowBlur = 0;
 
-    c.strokeStyle = 'rgba(122,92,255,0.16)'; c.lineWidth = 1.5;
-    c.beginPath();
-    for (let rx = F.x0; rx < F.x1; rx += 220) { c.moveTo(rx, gy + 150); c.lineTo(rx, gy + 380 - 6); }
-    c.stroke();
+    this.drawHexField(F.x0 - 60, gy + 150, F.x1 - F.x0 + 120, 380 - 150 - 6, 24, '#E8E0D8', 0.05);
 
     c.fillStyle = 'rgba(249,219,8,0.5)';
     c.font = '600 11px "DM Mono", monospace';
@@ -562,19 +816,19 @@ export class WorldEngine {
     const ya = floorY(L.a); const yb = floorY(L.b);
     const top = Math.min(ya, yb); const bot = Math.max(ya, yb);
     const g = c.createLinearGradient(L.x, top - 190, L.x, bot);
-    g.addColorStop(0, 'rgba(0,217,255,0)');
-    g.addColorStop(0.35, 'rgba(0,217,255,0.16)');
-    g.addColorStop(1, 'rgba(0,217,255,0.05)');
+    g.addColorStop(0, 'rgba(232,224,216,0)');
+    g.addColorStop(0.35, 'rgba(232,224,216,0.13)');
+    g.addColorStop(1, 'rgba(232,224,216,0.04)');
     c.fillStyle = g;
     c.fillRect(L.x - 42, top - 190, 84, bot - top + 190);
 
-    c.strokeStyle = 'rgba(0,217,255,0.5)'; c.lineWidth = 2;
+    c.strokeStyle = 'rgba(232,224,216,0.4)'; c.lineWidth = 2;
     c.beginPath();
     c.moveTo(L.x - 42, bot); c.lineTo(L.x - 42, top - 190);
     c.moveTo(L.x + 42, bot); c.lineTo(L.x + 42, top - 190);
     c.stroke();
 
-    c.strokeStyle = '#00D9FF'; c.lineWidth = 2.5;
+    c.strokeStyle = INK; c.lineWidth = 2.5;
     for (let i = 0; i < 7; i++) {
       const yy = bot - ((this.t * 70 + i * 80) % (bot - top + 150));
       c.globalAlpha = 0.16 + 0.3 * Math.sin(this.t * 3 + i);
@@ -585,74 +839,30 @@ export class WorldEngine {
     c.globalAlpha = 1;
 
     for (const y of [ya, yb]) {
-      c.fillStyle = 'rgba(0,217,255,0.16)';
+      c.fillStyle = 'rgba(249,219,8,0.16)';
       this.rr(L.x - 46, y - 9, 92, 9, 3); c.fill();
-      c.fillStyle = '#00D9FF';
-      c.shadowColor = '#00D9FF'; c.shadowBlur = 14;
+      c.fillStyle = ACCENT;
+      c.shadowColor = ACCENT; c.shadowBlur = 14;
       c.fillRect(L.x - 46, y - 9, 92, 2.5);
       c.shadowBlur = 0;
     }
 
-    c.fillStyle = 'rgba(0,217,255,0.75)';
+    c.fillStyle = 'rgba(232,224,216,0.7)';
     c.font = '600 10px "DM Mono", monospace';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
     c.fillText('LIFT', L.x, top - 202);
   }
 
-  private drawCave() {
-    const c = this.ctx;
-    const gy = floorY(CAVE.f); const cx = CAVE.x + CAVE.w / 2;
-    const hg = c.createLinearGradient(0, gy - 250, 0, gy);
-    hg.addColorStop(0, '#0A0715'); hg.addColorStop(1, '#160D24');
-    c.fillStyle = hg;
-    c.beginPath();
-    c.moveTo(CAVE.x - 130, gy);
-    c.quadraticCurveTo(CAVE.x + 20, gy - 246, cx + 10, gy - 252);
-    c.quadraticCurveTo(CAVE.x + CAVE.w + 120, gy - 236, CAVE.x + CAVE.w + 180, gy);
-    c.closePath(); c.fill();
-    c.strokeStyle = 'rgba(249,219,8,0.3)'; c.lineWidth = 2; c.stroke();
-
-    const mg = c.createRadialGradient(cx, gy - 56, 4, cx, gy - 56, 135);
-    mg.addColorStop(0, '#FBE446'); mg.addColorStop(0.28, '#3A1200'); mg.addColorStop(1, '#050208');
-    c.fillStyle = mg;
-    c.beginPath();
-    c.moveTo(cx - 78, gy); c.lineTo(cx - 78, gy - 92);
-    c.quadraticCurveTo(cx, gy - 196, cx + 78, gy - 92);
-    c.lineTo(cx + 78, gy);
-    c.closePath(); c.fill();
-    c.strokeStyle = '#F9DB08'; c.lineWidth = 2.5;
-    c.shadowColor = '#F9DB08'; c.shadowBlur = 18 + Math.sin(this.t * 3) * 7;
-    c.stroke(); c.shadowBlur = 0;
-
-    c.textAlign = 'center';
-    c.fillStyle = '#F9DB08'; c.font = '600 12px "DM Mono", monospace';
-    c.fillText('THE CAVE', cx, gy - 228);
-    c.fillStyle = 'rgba(232,224,216,0.5)'; c.font = '9px "DM Mono", monospace';
-    c.fillText('the archivist keeps the CV', cx, gy - 212);
-
-    ['e', '∫', '∞'].forEach((r, i) => {
-      c.globalAlpha = 0.3 + 0.3 * Math.sin(this.t * 2 + i * 1.6);
-      c.fillStyle = '#FFB067';
-      c.font = 'italic 19px "Instrument Serif", Georgia, serif';
-      c.fillText(r, cx - 84 + i * 84, gy - 176 - Math.sin(this.t + i) * 5);
-      c.globalAlpha = 1;
-    });
-  }
-
   private drawCrate(cr: Crate) {
     const c = this.ctx;
     const y = floorY(cr.f) - cr.h;
-    c.fillStyle = '#171326';
+    c.fillStyle = '#171618';
     this.rr(cr.x, y, cr.w, cr.h, 5); c.fill();
-    c.strokeStyle = 'rgba(255,176,103,0.55)'; c.lineWidth = 1.6;
+    c.strokeStyle = 'rgba(232,224,216,0.4)'; c.lineWidth = 1.6;
     this.rr(cr.x + 3, y + 3, cr.w - 6, cr.h - 6, 4); c.stroke();
-    c.strokeStyle = 'rgba(255,176,103,0.22)'; c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(cr.x + 5, y + 5); c.lineTo(cr.x + cr.w - 5, y + cr.h - 5);
-    c.moveTo(cr.x + cr.w - 5, y + 5); c.lineTo(cr.x + 5, y + cr.h - 5);
-    c.stroke();
-    c.fillStyle = '#FFB067';
-    c.shadowColor = '#FFB067'; c.shadowBlur = 10;
+    this.drawHexField(cr.x + 3, y + 3, cr.w - 6, cr.h - 6, 9, '#E8E0D8', 0.22);
+    c.fillStyle = ACCENT_DIM;
+    c.shadowColor = ACCENT_DIM; c.shadowBlur = 8;
     c.fillRect(cr.x, y, cr.w, 2.5);
     c.shadowBlur = 0;
   }
@@ -661,18 +871,18 @@ export class WorldEngine {
     const c = this.ctx;
     const y = floorY(b.f); const k = b.flash ?? 0; const lift = k * 7;
     const g = c.createLinearGradient(0, y - 90, 0, y);
-    g.addColorStop(0, 'rgba(122,92,255,0)');
-    g.addColorStop(1, 'rgba(122,92,255,' + (0.13 + k * 0.3) + ')');
+    g.addColorStop(0, 'rgba(249,219,8,0)');
+    g.addColorStop(1, 'rgba(249,219,8,' + (0.13 + k * 0.3) + ')');
     c.fillStyle = g; c.fillRect(b.x, y - 90, b.w, 90);
 
-    c.fillStyle = '#150F2A';
+    c.fillStyle = '#171410';
     this.rr(b.x, y - 13 - lift, b.w, 13 + lift, 5); c.fill();
-    c.fillStyle = '#7A5CFF';
-    c.shadowColor = '#7A5CFF'; c.shadowBlur = 16 + k * 22;
+    c.fillStyle = ACCENT;
+    c.shadowColor = ACCENT; c.shadowBlur = 16 + k * 22;
     c.fillRect(b.x, y - 13 - lift, b.w, 3);
     c.shadowBlur = 0;
 
-    c.strokeStyle = 'rgba(122,92,255,' + (0.4 + 0.35 * Math.sin(this.t * 4)) + ')';
+    c.strokeStyle = 'rgba(249,219,8,' + (0.4 + 0.35 * Math.sin(this.t * 4)) + ')';
     c.lineWidth = 2.4;
     for (let i = 0; i < 2; i++) {
       const ay = y - 28 - i * 15 - lift;
@@ -688,112 +898,232 @@ export class WorldEngine {
     const c = this.ctx;
     const x = m.cx ?? this.moverX(m);
     const y = this.moverTop(m);
-    c.strokeStyle = 'rgba(0,217,255,0.16)'; c.lineWidth = 1.5;
+    c.strokeStyle = 'rgba(232,224,216,0.13)'; c.lineWidth = 1.5;
     c.setLineDash([7, 9]);
     c.beginPath();
     c.moveTo(m.x0, y + 8); c.lineTo(m.x1 + m.w, y + 8);
     c.stroke();
     c.setLineDash([]);
 
-    c.fillStyle = '#131b28';
+    c.fillStyle = '#16140f';
     this.rr(x, y, m.w, 17, 4); c.fill();
-    c.fillStyle = '#00D9FF';
-    c.shadowColor = '#00D9FF'; c.shadowBlur = 16;
+    c.fillStyle = INK;
+    c.shadowColor = INK; c.shadowBlur = 12;
     c.fillRect(x, y, m.w, 2.5);
     c.shadowBlur = 0;
-    c.fillStyle = 'rgba(0,217,255,0.5)';
+    c.fillStyle = 'rgba(232,224,216,0.5)';
     c.font = '600 9px "DM Mono", monospace';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
     c.fillText('⇄', x + m.w / 2, y + 13);
   }
 
+
   private drawSigil(g: Sigil) {
     if (this.got[g.id]) return;
     const c = this.ctx;
     const y = floorY(g.f) - g.dy + Math.sin(this.t * 2.1 + g.x) * 5;
-    const rg = c.createRadialGradient(g.x, y, 2, g.x, y, 40);
-    rg.addColorStop(0, 'rgba(122,92,255,0.34)');
-    rg.addColorStop(1, 'rgba(122,92,255,0)');
+    const pulse = 0.55 + 0.35 * Math.sin(this.t * 2.4 + g.x);
+    const rg = c.createRadialGradient(g.x, y, 2, g.x, y, 38);
+    rg.addColorStop(0, 'rgba(179,158,6,' + (0.24 * pulse) + ')');
+    rg.addColorStop(1, 'rgba(179,158,6,0)');
     c.fillStyle = rg;
-    c.beginPath(); c.arc(g.x, y, 40, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(g.x, y, 38, 0, Math.PI * 2); c.fill();
 
     c.save();
     c.translate(g.x, y);
-    c.rotate(Math.sin(this.t * 1.3 + g.x) * 0.22);
-    c.strokeStyle = 'rgba(122,92,255,0.75)'; c.lineWidth = 1.6;
-    c.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
-      const px = Math.cos(a) * 17; const py = Math.sin(a) * 17;
-      if (i) c.lineTo(px, py); else c.moveTo(px, py);
-    }
-    c.closePath(); c.stroke();
+    c.rotate(Math.sin(this.t * 1.3 + g.x) * 0.18);
+    c.strokeStyle = 'rgba(232,224,216,0.4)'; c.lineWidth = 1.6;
+    this.rr(-15, -15, 30, 30, 8); c.stroke();
     c.restore();
 
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.font = 'italic 21px "Instrument Serif", Georgia, serif';
-    c.shadowColor = '#7A5CFF'; c.shadowBlur = 14;
-    c.fillStyle = '#C9BBFF';
+    c.font = '600 20px "DM Mono", monospace';
+    c.shadowColor = ACCENT_DIM; c.shadowBlur = 10 * pulse;
+    c.fillStyle = '#D8C87A';
     c.fillText(g.s, g.x, y + 1);
     c.shadowBlur = 0;
     c.textBaseline = 'alphabetic';
   }
 
-  private drawNpc(n: Npc) {
-    const c = this.ctx;
-    const gy = floorY(n.f);
-    const bob = Math.sin(this.t * 1.6 + n.x) * 3.5;
-    const isNear = this.near !== null && 'id' in this.near && this.near.id === n.id;
-    const seen = !!this.found[n.id];
-    const col = seen ? '#00D9FF' : '#F9DB08';
 
-    const pg = c.createRadialGradient(n.x, gy, 2, n.x, gy, 92);
-    pg.addColorStop(0, seen ? 'rgba(0,217,255,0.18)' : 'rgba(249,219,8,0.2)');
+  private caveArchPath(x: number, top: number, left: number, w: number, gy: number) {
+    const c = this.ctx;
+    c.beginPath();
+    c.moveTo(left, gy);
+    c.lineTo(left, top + 34);
+    c.quadraticCurveTo(left, top, x, top);
+    c.quadraticCurveTo(left + w, top, left + w, top + 34);
+    c.lineTo(left + w, gy);
+  }
+
+  private drawCave(n: Npc) {
+    const c = this.ctx;
+    const gy = floorY(n.f) - (n.dy ?? 0);
+    const seen = !!this.found[n.id];
+    const col = seen ? ACCENT : INK;
+    const x = n.x;
+    const w = 120, h = 72;
+    const left = x - w / 2, top = gy - h;
+
+    const pg = c.createRadialGradient(x, gy, 4, x, gy, 110);
+    pg.addColorStop(0, seen ? 'rgba(249,219,8,0.18)' : 'rgba(232,224,216,0.08)');
     pg.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = pg;
-    c.beginPath(); c.ellipse(n.x, gy, 92, 26, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(x, gy, 110, 30, 0, 0, Math.PI * 2); c.fill();
 
-    c.fillStyle = '#171426';
-    c.strokeStyle = col; c.lineWidth = 1.8;
-    c.globalAlpha = isNear ? 1 : 0.82;
-    c.beginPath();
-    c.moveTo(n.x - 19, gy);
-    c.lineTo(n.x - 11, gy - 40 + bob);
-    c.quadraticCurveTo(n.x, gy - 52 + bob, n.x + 11, gy - 40 + bob);
-    c.lineTo(n.x + 19, gy);
+    this.caveArchPath(x, top, left, w, gy);
     c.closePath();
-    c.fill(); c.stroke();
+    c.fillStyle = '#141119';
+    c.fill();
 
-    c.beginPath();
-    c.arc(n.x, gy - 52 + bob, 11, 0, Math.PI * 2);
-    c.fillStyle = '#0E0B18'; c.fill(); c.stroke();
+    c.save();
+    this.caveArchPath(x, top, left, w, gy);
+    c.closePath();
+    c.clip();
+    this.drawHexField(left, top, w, h, 11, col, 0.16);
+    c.restore();
 
-    c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.font = 'italic 15px "Instrument Serif", Georgia, serif';
-    c.fillStyle = col;
-    c.shadowColor = col; c.shadowBlur = 12;
-    c.fillText(n.glyph, n.x, gy - 52 + bob + 1);
-    c.shadowBlur = 0;
+    this.caveArchPath(x, top, left, w, gy);
+    c.strokeStyle = col;
+    c.globalAlpha = 0.55;
+    c.lineWidth = 2.4;
+    c.stroke();
     c.globalAlpha = 1;
 
+    const mouthW = w * 0.52, mouthH = h * 0.72;
+    const mg = c.createRadialGradient(x, gy - 2, 2, x, gy - 2, mouthW * 0.75);
+    mg.addColorStop(0, seen ? 'rgba(249,219,8,0.4)' : 'rgba(232,224,216,0.22)');
+    mg.addColorStop(1, 'rgba(8,7,10,0.92)');
+    c.fillStyle = mg;
+    c.beginPath();
+    c.moveTo(x - mouthW / 2, gy);
+    c.lineTo(x - mouthW / 2, gy - mouthH + 20);
+    c.quadraticCurveTo(x - mouthW / 2, gy - mouthH, x, gy - mouthH);
+    c.quadraticCurveTo(x + mouthW / 2, gy - mouthH, x + mouthW / 2, gy - mouthH + 20);
+    c.lineTo(x + mouthW / 2, gy);
+    c.closePath();
+    c.fill();
+
+    c.fillStyle = ACCENT;
+    c.shadowColor = ACCENT; c.shadowBlur = 10;
+    c.beginPath(); c.arc(x, top + 6, 4.5, 0, Math.PI * 2); c.fill();
+    c.shadowBlur = 0;
+
+    c.globalAlpha = 1;
     c.font = '600 9px "DM Mono", monospace';
-    c.fillStyle = isNear ? col : 'rgba(232,224,216,0.45)';
-    c.textBaseline = 'alphabetic';
-    c.fillText(n.name.toUpperCase(), n.x, gy - 78 + bob);
+    c.fillStyle = seen ? col : 'rgba(232,224,216,0.45)';
+    c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    c.fillText(n.name.toUpperCase(), x, top - 12);
     if (seen) {
-      c.fillStyle = 'rgba(0,217,255,0.7)';
+      c.fillStyle = 'rgba(249,219,8,0.75)';
       c.font = '8px "DM Mono", monospace';
-      c.fillText('· found ·', n.x, gy - 66 + bob);
+      c.fillText('· found ·', x, top - 1);
     }
   }
 
+  private drawCaveScene() {
+    const c = this.ctx;
+    const n = this.activeCave;
+    const seen = !!(n && this.found[n.id]);
+    c.save();
+    c.scale(this.DPR * this.S, this.DPR * this.S);
+    c.clearRect(0, 0, this.VW, this.VH);
+
+    const sg = c.createLinearGradient(0, 0, 0, this.VH);
+    sg.addColorStop(0, '#120D08'); sg.addColorStop(1, '#050403');
+    c.fillStyle = sg; c.fillRect(0, 0, this.VW, this.VH);
+
+    c.save();
+    c.translate(-this.camX, -this.camY);
+
+    const top = -230, bot = 40;
+    c.fillStyle = '#181119';
+    c.fillRect(-100, top, CORRIDOR_LEN + 200, bot - top);
+    this.drawHexField(-100, top, CORRIDOR_LEN + 200, bot - top, 13, INK, 0.07);
+
+    c.shadowColor = ACCENT; c.shadowBlur = 14;
+    c.fillStyle = ACCENT;
+    c.fillRect(-100, -2.5, CORRIDOR_LEN + 200, 3);
+    c.shadowBlur = 0;
+
+    for (let tx = 70; tx < CORRIDOR_LEN; tx += 130) {
+      const flick = 0.6 + 0.4 * Math.sin(this.t * 6 + tx);
+      c.fillStyle = 'rgba(249,219,8,0.10)';
+      c.beginPath(); c.arc(tx, -150, 46 * flick, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#0C0A08';
+      this.rr(tx - 4, -168, 8, 42, 3); c.fill();
+      c.fillStyle = ACCENT;
+      c.shadowColor = ACCENT; c.shadowBlur = 16 * flick;
+      c.beginPath(); c.arc(tx, -172, 5 * flick, 0, Math.PI * 2); c.fill();
+      c.shadowBlur = 0;
+    }
+
+    for (const ex of [0, CORRIDOR_LEN]) {
+      c.strokeStyle = 'rgba(249,219,8,0.35)'; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(ex, -2); c.lineTo(ex, top + 30); c.stroke();
+    }
+
+    if (n) {
+      const jy = -30 + Math.sin(this.t * 2) * 4;
+      const pulse = 0.6 + 0.4 * Math.sin(this.t * 2.4);
+      const col = seen ? ACCENT : INK;
+      const jg = c.createRadialGradient(JEWEL_X, jy, 2, JEWEL_X, jy, 64);
+      jg.addColorStop(0, 'rgba(249,219,8,' + (0.32 * pulse) + ')');
+      jg.addColorStop(1, 'rgba(249,219,8,0)');
+      c.fillStyle = jg;
+      c.beginPath(); c.arc(JEWEL_X, jy, 64, 0, Math.PI * 2); c.fill();
+
+      c.save();
+      c.translate(JEWEL_X, jy);
+      c.rotate(Math.PI / 4 + Math.sin(this.t * 1.4) * 0.08);
+      c.fillStyle = col;
+      c.shadowColor = ACCENT; c.shadowBlur = 18 * pulse;
+      c.fillRect(-9, -9, 18, 18);
+      c.strokeStyle = '#0B0A08'; c.lineWidth = 1.4;
+      c.strokeRect(-9, -9, 18, 18);
+      c.shadowBlur = 0;
+      c.restore();
+
+      c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+      c.font = '600 9px "DM Mono", monospace';
+      c.fillStyle = this.nearJewel ? col : 'rgba(232,224,216,0.5)';
+      c.fillText(n.title.toUpperCase(), JEWEL_X, jy - 32);
+      if (seen) {
+        c.fillStyle = 'rgba(249,219,8,0.7)';
+        c.font = '8px "DM Mono", monospace';
+        c.fillText('· found ·', JEWEL_X, jy - 21);
+      }
+    }
+
+    c.save();
+    c.translate(this.player.x + PW / 2, this.player.y + PH / 2);
+    c.rotate(this.player.rot);
+    c.scale((1 + this.player.squash * 0.24) * this.player.facing, 1 - this.player.squash * 0.26);
+    this.drawPixelChar(0, 17, 1.7, ACCENT, 1);
+    c.restore();
+
+    c.restore();
+
+    const vg = c.createRadialGradient(
+      this.VW / 2, this.VH / 2, this.VH * 0.3,
+      this.VW / 2, this.VH / 2, this.VH * 0.9,
+    );
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.6)');
+    c.fillStyle = vg;
+    c.fillRect(0, 0, this.VW, this.VH);
+
+    c.restore();
+  }
+
   private draw() {
+    if (this.view !== 'world') { this.drawCaveScene(); return; }
     const c = this.ctx;
     c.save();
     c.scale(this.DPR * this.S, this.DPR * this.S);
     c.clearRect(0, 0, this.VW, this.VH);
 
-    /* sky */
+
     const sg = c.createLinearGradient(0, 0, 0, this.VH);
     sg.addColorStop(0, '#0A0912'); sg.addColorStop(1, '#06070C');
     c.fillStyle = sg; c.fillRect(0, 0, this.VW, this.VH);
@@ -816,16 +1146,16 @@ export class WorldEngine {
       const my = mo.y - this.camY * 0.4 + Math.sin(this.t * 0.8 + m) * 7;
       if (mx < -70 || mx > this.VW + 70 || my < -70 || my > this.VH + 70) continue;
       c.globalAlpha = mo.a;
-      c.fillStyle = '#9BD6FF';
+      c.fillStyle = ACCENT_DIM;
       c.font = 'italic ' + mo.sc + 'px "Instrument Serif", Georgia, serif';
       c.fillText(mo.s, mx, my);
     }
     c.globalAlpha = 1;
 
     c.save();
-    c.translate(-this.camX, -this.camY);            /* ---- world space ---- */
+    c.translate(-this.camX, -this.camY);
 
-    c.strokeStyle = 'rgba(122,92,255,0.075)'; c.lineWidth = 1;
+    c.strokeStyle = 'rgba(232,224,216,0.05)'; c.lineWidth = 1;
     c.beginPath();
     const gx0 = Math.floor((this.camX - 120) / 110) * 110;
     for (let v = gx0; v < this.camX + this.VW + 110; v += 110) {
@@ -840,14 +1170,13 @@ export class WorldEngine {
 
     for (let f2 = 2; f2 >= 0; f2--) this.drawFloorSlab(f2);
     LIFTS.forEach((L) => this.drawLift(L));
-    this.drawCave();
 
     for (const pl of PLATS) {
       const ty = floorY(pl.f) - pl.dy;
-      c.fillStyle = '#141626';
+      c.fillStyle = '#16140f';
       this.rr(pl.x, ty, pl.w, 17, 4); c.fill();
-      c.fillStyle = '#00D9FF';
-      c.shadowColor = '#00D9FF'; c.shadowBlur = 14;
+      c.fillStyle = INK;
+      c.shadowColor = INK; c.shadowBlur = 12;
       c.fillRect(pl.x, ty, pl.w, 2.5);
       c.shadowBlur = 0;
     }
@@ -857,7 +1186,7 @@ export class WorldEngine {
     for (const m of MOVERS) this.drawMover(m);
     for (const g of SIGILS) this.drawSigil(g);
 
-    for (const n of NPCS) this.drawNpc(n);
+    for (const n of NPCS) this.drawCave(n);
 
     for (const pt of this.parts) {
       c.globalAlpha = Math.max(0, 1 - pt.t / pt.life);
@@ -876,26 +1205,24 @@ export class WorldEngine {
     }
     c.globalAlpha = 1;
 
-    /* ---- the character: the constant itself ---- */
+
     c.save();
     c.translate(this.player.x + PW / 2, this.player.y + PH / 2);
     c.rotate(this.player.rot);
-    c.scale(1 + this.player.squash * 0.24, 1 - this.player.squash * 0.26);
-    const au = c.createRadialGradient(0, 0, 2, 0, 0, 58);
-    au.addColorStop(0, 'rgba(249,219,8,0.40)');
-    au.addColorStop(0.45, 'rgba(249,219,8,0.12)');
+    c.scale((1 + this.player.squash * 0.24) * this.player.facing, 1 - this.player.squash * 0.26);
+
+    const au = c.createRadialGradient(0, 0, 2, 0, 0, 46);
+    au.addColorStop(0, 'rgba(249,219,8,0.30)');
     au.addColorStop(1, 'rgba(249,219,8,0)');
     c.fillStyle = au;
-    c.beginPath(); c.arc(0, 0, 58, 0, Math.PI * 2); c.fill();
-    c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.font = 'italic 72px "Instrument Serif", Georgia, serif';
-    c.shadowColor = '#F9DB08'; c.shadowBlur = 32; c.fillStyle = '#FBE446'; c.fillText('e', 0, 2);
-    c.shadowBlur = 17; c.fillStyle = '#FFC48A'; c.fillText('e', 0, 2);
-    c.shadowBlur = 7; c.fillStyle = '#FFF3E6'; c.fillText('e', 0, 2);
-    c.shadowBlur = 0;
+    c.beginPath(); c.arc(0, 0, 46, 0, Math.PI * 2); c.fill();
+
+
+    this.drawPixelChar(0, 17, 1.7, ACCENT, 1);
+
     c.restore();
 
-    c.restore();                                     /* ---- screen space ---- */
+    c.restore();
 
     const vg = c.createRadialGradient(
       this.VW / 2, this.VH / 2, this.VH * 0.34,

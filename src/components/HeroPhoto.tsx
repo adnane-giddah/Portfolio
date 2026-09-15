@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { PROFILE } from '../data/profile';
 
-/**
- * The round portrait in the hero — just the photo, an orange rim and a
- * glow. Until public/photo.jpg exists it shows the same circle with the
- * mark in it, so the layout never shifts when the picture is dropped in.
- */
 export function HeroPhoto() {
   const [failed, setFailed] = useState(false);
 

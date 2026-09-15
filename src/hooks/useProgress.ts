@@ -16,7 +16,7 @@ function read(): Progress {
     (parsed.got ?? []).forEach((id) => { got[id] = true; });
     return { found, got, muted: !!parsed.muted };
   } catch {
-    /* private mode, cleared storage, quota — a fresh start is fine */
+
     return empty;
   }
 }
@@ -29,16 +29,10 @@ function write(p: Progress) {
       muted: p.muted,
     }));
   } catch {
-    /* nothing we can do, and nothing worth breaking the page over */
+
   }
 }
 
-/**
- * Which characters you have met and which sigils you have picked up,
- * persisted to localStorage. React owns this; the engine gets a copy each
- * time it changes and reports back through callbacks, so the 60fps loop
- * never has to go through setState.
- */
 export function useProgress() {
   const [state, setState] = useState<Progress>(read);
 

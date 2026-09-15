@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from 'react';
 
 export interface Toast { id: number; msg: string; out?: boolean }
 
-/** The small orange notices in the top-right corner. */
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const next = useRef(1);

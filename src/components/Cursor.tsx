@@ -1,11 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFinePointer } from '../hooks/useMediaQuery';
 
-/**
- * An orange ring that trails the pointer. It is decoration only — the real
- * system cursor is never hidden, so you can always see where you are
- * clicking. On touch devices this renders nothing at all.
- */
 export function Cursor() {
   const ref = useRef<HTMLDivElement | null>(null);
   const fine = useFinePointer();
@@ -33,7 +28,7 @@ export function Cursor() {
     };
 
     document.addEventListener('mousemove', move);
-    /* delegated, so it keeps working for anything React renders later */
+
     document.addEventListener('mouseover', over);
     document.addEventListener('mouseout', out);
     return () => {

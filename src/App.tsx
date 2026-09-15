@@ -37,15 +37,11 @@ export default function App() {
   const openWorld = useCallback((seek?: SectionId) => {
     setSeekId(seek);
     setWorldOpen(true);
-    setNavCloseSignal((n) => n + 1);   /* the phone menu must not hang over the world */
+    setNavCloseSignal((n) => n + 1);
   }, []);
 
   const exitWorld = useCallback(() => setWorldOpen(false), []);
 
-  /**
-   * The escape hatch. Unlocks every gated section and, if we are inside
-   * the world, drops the player back onto the ordinary page.
-   */
   const skipEverything = useCallback((scrollTo?: string) => {
     revealAll();
     setWorldOpen(false);
@@ -146,7 +142,6 @@ export default function App() {
 
       <Footer />
 
-      {/* kept out of the flow; the CV lives in the cave */}
       <a href={PROFILE.cvHref} hidden download>
         CV
       </a>

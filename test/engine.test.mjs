@@ -1,10 +1,4 @@
-/* ---------------------------------------------------------------
-   Physics checks for the ported engine.
 
-   Bundles src/world/engine.ts with esbuild (already a Vite dependency),
-   runs it against a minimal canvas/window stub, and asserts the same
-   behaviour the original vanilla build had. Run with: npm test
-   --------------------------------------------------------------- */
 
 import { build } from 'esbuild';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -15,7 +9,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const outDir = join(here, '.tmp');
 
-/* ---------------- stubs ---------------- */
 function ctx2d() {
   const o = { canvas: {} };
   const noop = () => {};
@@ -46,7 +39,6 @@ function installGlobals() {
   return canvas;
 }
 
-/* ---------------- harness ---------------- */
 let fails = 0;
 function ok(cond, msg) {
   console.log((cond ? '  PASS  ' : '  FAIL  ') + msg);
@@ -56,9 +48,7 @@ function ok(cond, msg) {
 const canvas = installGlobals();
 
 mkdirSync(outDir, { recursive: true });
-/* One entry re-exporting both, so the engine and the test share the very
-   same module instance — otherwise each bundle gets its own MOVERS array
-   and nothing the engine mutates is visible here. */
+
 const entry = join(outDir, 'entry.ts');
 const posix = (p) => p.split('\\').join('/');
 writeFileSync(
@@ -84,13 +74,14 @@ const {
 
 const noop = () => {};
 const engine = new WorldEngine(canvas, {
-  onHud: noop, onPrompt: noop, onTalk: noop, onSigil: noop,
+  onHud: noop, onPrompt: noop, onEnterCave: noop, onExitCave: noop, onOpenContent: noop, onSigil: noop,
 });
 engine.resize({ clientWidth: 1280, clientHeight: 720 });
 
 const P = engine.player;
 const step = (n, dt = 1 / 60) => { for (let i = 0; i < n; i++) engine.update(dt); };
 function place(f, x) {
+  engine.view = 'world';
   P.floor = f; P.x = x; P.y = floorY(f) - PH;
   P.vx = 0; P.vy = 0; P.ground = true; P.rideOn = null;
   engine.input.left = false; engine.input.right = false;
@@ -99,20 +90,17 @@ function place(f, x) {
 console.log('\nported engine — physics');
 console.log(`  data: ${SIGILS.length} sigils · ${CRATES.length} crates · ${BPADS.length} pads · ${MOVERS.length} movers`);
 
-/* 1. a crate stops you */
-place(0, 400);
+place(0, 460);
 engine.input.right = true;
 step(220);
 engine.input.right = false;
 ok(Math.abs(P.x - (560 - PW)) < 3, `walking into the crate at x=560 stops you (x=${P.x.toFixed(1)})`);
 
-/* 2. crate tops hold you up */
 place(0, 560);
 P.x = 560; P.y = floorY(0) - 56 - PH; P.ground = true;
 step(10);
 ok(P.ground && Math.abs(P.y - (floorY(0) - 56 - PH)) < 2, 'a crate top holds you up');
 
-/* 3. a bounce pad launches you far past a jump */
 const pad = BPADS[0];
 place(0, pad.x + 10);
 P.y = floorY(0) - PH - 40; P.ground = false; P.vy = 200;
@@ -120,7 +108,6 @@ let maxUp = 0;
 for (let i = 0; i < 200; i++) { engine.update(1 / 60); maxUp = Math.max(maxUp, floorY(0) - PH - P.y); }
 ok(maxUp > 180, `the pad launches you ${maxUp.toFixed(0)}px (a plain jump is ~122)`);
 
-/* 4. a sliding ledge carries you */
 const mv = MOVERS[0];
 step(1);
 place(0, (mv.cx ?? mv.x0) + 30);
@@ -130,7 +117,6 @@ step(120);
 ok(P.rideOn === mv, 'standing on the sliding ledge registers as riding it');
 ok(Math.abs(P.x - before) > 8, `the ledge carried you ${(P.x - before).toFixed(1)}px`);
 
-/* 5. sigils get collected */
 const g = SIGILS[0];
 engine.got = {};
 place(g.f, g.x - PW / 2);
@@ -139,14 +125,13 @@ step(3);
 ok(engine.got[g.id] === true, `walking into sigil ${g.s} collects it`);
 ok(engine.gotCount() === 1, `the counter reads ${engine.gotCount()}/12`);
 
-/* 6. you can never fall out of the level */
 place(0, 900);
 P.y = floorY(0) + 900; P.vy = 900;
 step(40);
 ok(P.y <= floorY(0) + 200, 'falling off is caught and you are set back down');
 
-/* 7. every sigil is still reachable */
 function reach(sig, seed) {
+  engine.view = 'world';
   engine.got = {};
   P.floor = sig.f;
   P.x = sig.x + (seed % 2 ? -420 : 420);
@@ -172,7 +157,6 @@ for (const sig of SIGILS) {
 }
 ok(unreachable === 0, `all ${SIGILS.length} sigils reachable`);
 
-/* 8. long random play without a crash */
 place(0, 0);
 let err = null;
 try {

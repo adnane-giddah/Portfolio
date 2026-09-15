@@ -12,11 +12,6 @@ interface Props {
   onExit: () => void;
 }
 
-/**
- * A section rendered inside the world. The original physically moved the
- * page's DOM nodes in and out of this panel; rendering the same component
- * in both places is the same result without the surgery.
- */
 function bodyFor(npc: Npc) {
   switch (npc.id) {
     case 'about': return <AboutBody />;
@@ -42,7 +37,7 @@ export function Panel({ npc, onBack, onExit }: Props) {
     <div className={'arc-panel' + (npc ? ' on' : '')}>
       <div className="pan-top">
         <button className="pan-back" type="button" onClick={onBack}>
-          ← Back to the map
+          ← Back to the cave
         </button>
         <div className="pan-who">
           <span className="pan-glyph">{npc?.glyph ?? '∫'}</span>
@@ -59,7 +54,7 @@ export function Panel({ npc, onBack, onExit }: Props) {
         <div>{npc ? bodyFor(npc) : null}</div>
         <div className="pan-foot">
           <button className="pan-back" type="button" onClick={onBack}>
-            ← Back to the map
+            ← Back to the cave
           </button>
         </div>
       </div>

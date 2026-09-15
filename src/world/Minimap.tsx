@@ -6,10 +6,6 @@ interface Props {
   found: Record<string, boolean>;
 }
 
-/**
- * Three stacked floor rows with a pip per character. Its `top` is set
- * imperatively by World.placeHud, which measures the bar above it.
- */
 export const Minimap = forwardRef<HTMLDivElement, Props>(function Minimap({ floor, found }, ref) {
   return (
     <div className="minimap" ref={ref}>
@@ -23,7 +19,7 @@ export const Minimap = forwardRef<HTMLDivElement, Props>(function Minimap({ floo
               key={n.id}
             />
           ))}
-          <span className="mm-you">e</span>
+          <span className="mm-you" />
         </div>
       ))}
     </div>

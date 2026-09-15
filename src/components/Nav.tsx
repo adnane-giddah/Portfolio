@@ -1,19 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NAV_LINKS, PROFILE } from '../data/profile';
+import { LogoMark } from './LogoMark';
 
 const MOBILE_BREAKPOINT = 860;
 
 interface Props {
   onToggleTheme: () => void;
-  /** closed from the outside — e.g. when the world overlay opens */
+
   forceClose?: number;
 }
 
-/**
- * Below 860px the links collapse into a real menu instead of shrinking to
- * unreadable 8px text. Closes on link tap, outside tap, Escape, and when
- * the viewport grows back to desktop.
- */
 export function Nav({ onToggleTheme, forceClose }: Props) {
   const [open, setOpen] = useState(false);
   const barRef = useRef<HTMLElement | null>(null);
@@ -54,7 +50,7 @@ export function Nav({ onToggleTheme, forceClose }: Props) {
   return (
     <nav ref={barRef} className={open ? 'nav-open' : undefined}>
       <a href="#hero" className="nav-logo" aria-label="Home">
-        <img src="logo-mark.svg" alt="" width="36" height="36" />
+        <LogoMark />
       </a>
 
       <button

@@ -6,10 +6,6 @@ interface Props {
   promptReady: boolean;
 }
 
-/**
- * On-screen controls for phones. Pointer events rather than click, so
- * holding a direction actually holds it.
- */
 export function TouchPad({ engine, promptReady }: Props) {
   const hold = (dir: 'left' | 'right', on: boolean) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -60,10 +56,10 @@ export function TouchPad({ engine, promptReady }: Props) {
           className={'pad-b pad-talk' + (promptReady ? ' ready' : '')}
           id="padE"
           type="button"
-          aria-label="Talk or ride"
+          aria-label="Use — ride the lift or open a jewel"
           onPointerDown={(e) => { e.preventDefault(); engine.current?.act(); }}
         >
-          <span className="pb-ar">◉</span> Talk
+          <span className="pb-ar">◉</span> Use
         </button>
       </div>
     </div>

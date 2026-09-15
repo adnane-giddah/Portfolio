@@ -1,6 +1,5 @@
 import { useReveal } from '../hooks/useReveal';
 import { SectionHeader } from './SectionHeader';
-import shot from '../assets/shot';
 
 interface Props {
   onPlay: () => void;
@@ -16,16 +15,15 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
       <SectionHeader num="00" title="The World" />
       <div className="showcase-wrap reveal" ref={ref}>
         <figure className="shot-frame">
-          {/* REPLACE ME: swap this src for your own project picture */}
           <img
             id="projectShot"
             className="shot-img"
-            src={shot}
-            alt="Project preview — placeholder image"
+            src="world-preview.jpg"
+            alt="The three-floor game map — Floor 1, Ground"
           />
           <figcaption className="shot-cap">
-            <b>Placeholder</b>
-            <span>swap the src of #projectShot for your image</span>
+            <b>Floor 1 — Ground</b>
+            <span>a live screenshot of the map below</span>
           </figcaption>
         </figure>
 
@@ -36,9 +34,9 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
             three&#8209;floor map.
           </h3>
           <p>
-            Walk it as <em>e</em>, the natural constant. Every floor holds people who keep one part
-            of the story — talk to them and their section opens right there. The cave on the ground
-            floor holds the CV.
+            Walk it as a small explorer. Every floor holds caves that lead into a short dungeon —
+            find the jewel inside to open that part of the story, then keep walking to come out the
+            other side. Along the way, collect the pieces of <em>Euler&apos;s identity</em>, e^iπ+1=0.
           </p>
           <div className="floor-list">
             <div className="floor-row">
@@ -51,7 +49,7 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
             </div>
             <div className="floor-row">
               <i />
-              <span>Floor 1</span> Ground · about, education, the cave
+              <span>Floor 1</span> Ground · about, education, the archive
             </div>
           </div>
 

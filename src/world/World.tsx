@@ -3,7 +3,6 @@ import { FLOORS, NPCS, SIGILS } from '../data/world';
 import type { Npc, PromptState, SectionId } from '../types';
 import { WorldEngine } from './engine';
 import { Minimap } from './Minimap';
-import { Dialogue } from './Dialogue';
 import { Panel } from './Panel';
 import { TouchPad } from './TouchPad';
 
@@ -34,21 +33,16 @@ export function World({
 
   const [hudFloor, setHudFloor] = useState(0);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
-  const [talking, setTalking] = useState<Npc | null>(null);
+  const [insideCave, setInsideCave] = useState<Npc | null>(null);
   const [panelFor, setPanelFor] = useState<Npc | null>(null);
   const [hintGone, setHintGone] = useState(false);
 
   const foundCount = NPCS.filter((n) => found[n.id]).length;
   const gotCount = SIGILS.filter((g) => got[g.id]).length;
 
-  /* keep the latest callbacks reachable from the engine without re-creating it */
   const cbs = useRef({ onFound, onGot, onToast });
   cbs.current = { onFound, onGot, onToast };
 
-  /* ---------------------------------------------------------------
-     Build the engine once. It is deliberately not re-created when
-     props change — it reads mutable records we keep in sync below.
-     --------------------------------------------------------------- */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -56,19 +50,21 @@ export function World({
     const engine = new WorldEngine(canvas, {
       onHud: () => setHudFloor(engine.player.floor),
       onPrompt: (p) => setPrompt(p),
-      onTalk: (npc) => {
-        engine.view = 'dlg';
-        engine.input.left = false;
-        engine.input.right = false;
-        engine.blip(660, 0.1, 'triangle', 0.05);
-        setTalking(npc);
+      onEnterCave: (npc) => setInsideCave(npc),
+      onExitCave: () => setInsideCave(null),
+      onOpenContent: (npc) => {
+        if (!engine.found[npc.id]) {
+          cbs.current.onFound(npc.id);
+          cbs.current.onToast(npc.title + ' unlocked');
+        }
+        setPanelFor(npc);
       },
       onSigil: (sigil, collected, total) => {
         cbs.current.onGot(sigil.id);
         cbs.current.onToast(
           collected >= total
-            ? 'All twelve sigils found'
-            : `Sigil ${sigil.s} — ${collected}/${total}`,
+            ? 'e^iπ+1=0 — the identity is complete'
+            : `"${sigil.s}" found — ${collected}/${total}`,
         );
       },
     });
@@ -79,7 +75,6 @@ export function World({
     };
   }, []);
 
-  /* mirror progress into the engine's mutable records */
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
@@ -92,17 +87,12 @@ export function World({
     if (e) e.muted = muted;
   }, [muted]);
 
-  /* ---------------------------------------------------------------
-     The top bar wraps differently on every screen, and the floor line
-     changes length as you collect things. Rather than guess an offset,
-     measure the bar and place the map — then the prompt — beneath it.
-     --------------------------------------------------------------- */
   const placeHud = useCallback(() => {
     const top = topRef.current;
     const map = mapRef.current;
     if (!top || !map) return;
     const h = top.offsetHeight;
-    if (!h) return;                       /* overlay hidden — nothing to measure */
+    if (!h) return;
     const mapTop = Math.round(h - 4);
     map.style.top = mapTop + 'px';
 
@@ -112,7 +102,7 @@ export function World({
       p.style.top = mapTop + (map.offsetHeight || 20) + 12 + 'px';
       p.style.bottom = 'auto';
     } else {
-      p.style.top = '';                   /* hand it back to the stylesheet */
+      p.style.top = '';
       p.style.bottom = '';
     }
   }, []);
@@ -121,9 +111,6 @@ export function World({
     if (open) placeHud();
   }, [open, hudFloor, foundCount, gotCount, prompt, placeHud]);
 
-  /* ---------------------------------------------------------------
-     Open / close
-     --------------------------------------------------------------- */
   useEffect(() => {
     const engine = engineRef.current;
     const host = hostRef.current;
@@ -137,7 +124,7 @@ export function World({
 
     document.body.classList.add('arc-open');
     engine.view = 'world';
-    setTalking(null);
+    setInsideCave(null);
     setPanelFor(null);
     engine.spawn(seekId);
     engine.resize(host);
@@ -153,7 +140,7 @@ export function World({
       placeHud();
     };
     window.addEventListener('resize', onResize);
-    /* one more pass after layout settles, so the first frame is placed right */
+
     const raf = requestAnimationFrame(placeHud);
 
     return () => {
@@ -165,9 +152,6 @@ export function World({
     };
   }, [open, seekId, placeHud]);
 
-  /* ---------------------------------------------------------------
-     Keyboard
-     --------------------------------------------------------------- */
   useEffect(() => {
     if (!open) return;
     const engine = engineRef.current;
@@ -177,14 +161,10 @@ export function World({
       const k = e.key;
       if (k === 'Escape') {
         if (panelFor) { closePanel(); return; }
-        if (talking) { endDialogue(); return; }
         onExit();
         return;
       }
-      if (engine.view !== 'world') {
-        if ((k === 'e' || k === 'E' || k === 'Enter') && talking) openPanel(talking);
-        return;
-      }
+      if (engine.view === 'panel') return;
       if (k === 'ArrowLeft' || k === 'a' || k === 'A') { engine.input.left = true; e.preventDefault(); }
       if (k === 'ArrowRight' || k === 'd' || k === 'D') { engine.input.right = true; e.preventDefault(); }
       if (k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W') { engine.jump(); e.preventDefault(); }
@@ -203,39 +183,13 @@ export function World({
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [open, talking, panelFor, onExit]);
 
-  /* ---------------------------------------------------------------
-     Dialogue / panel
-     --------------------------------------------------------------- */
-  const endDialogue = useCallback(() => {
-    const engine = engineRef.current;
-    setTalking(null);
-    if (engine && !panelFor) engine.view = 'world';
-  }, [panelFor]);
-
-  const openPanel = useCallback((npc: Npc) => {
-    const engine = engineRef.current;
-    if (!found[npc.id]) {
-      cbs.current.onFound(npc.id);
-      cbs.current.onToast(npc.title + ' unlocked');
-    }
-    setTalking(null);
-    setPanelFor(npc);
-    if (engine) {
-      engine.view = 'panel';
-      engine.sweep(520, 900, 0.22, 'sine');
-    }
-  }, [found]);
+  }, [open, panelFor, onExit]);
 
   const closePanel = useCallback(() => {
     const engine = engineRef.current;
     setPanelFor(null);
-    if (engine) {
-      engine.view = 'world';
-      engine.blip(420, 0.1, 'sine', 0.04);
-    }
+    if (engine) engine.closePanel();
   }, []);
 
   const F = FLOORS[hudFloor];
@@ -244,7 +198,7 @@ export function World({
     <div
       id="arcade"
       ref={hostRef}
-      className={(open ? 'on' : '') + (open && !panelFor ? ' playing' : '')}
+      className={(open ? 'on playing' : '')}
       role="dialog"
       aria-modal="true"
       aria-label="The world — a three-floor map"
@@ -252,20 +206,33 @@ export function World({
     >
       <canvas id="gcv" ref={canvasRef} />
 
-      {/* top bar: where you are + the way back to the first interface */}
       <div className="arc-top" ref={topRef}>
         <button className="arc-exit" type="button" onClick={onExit}>
           ← Back to the site
         </button>
         <div className="arc-where">
           <div className="arc-floor">
-            FLOOR <b>{hudFloor + 1}</b> / 3 · <span>{F.name}</span>
+            {insideCave ? (
+              <>
+                <span className="arc-glyph">{insideCave.glyph}</span> <b>{insideCave.name}</b>
+              </>
+            ) : (
+              <>
+                FLOOR <b>{hudFloor + 1}</b> / 3 · <span>{F.name}</span>
+              </>
+            )}
           </div>
           <div className="arc-sub">
-            {F.sub} · <span>{foundCount}</span>/{NPCS.length} areas ·{' '}
-            <span className="hud-sig">
-              {gotCount}/{SIGILS.length} sigils
-            </span>
+            {insideCave ? 'find the jewel to open this section' : (
+              <>{F.sub} · <span>{foundCount}</span>/{NPCS.length} areas</>
+            )}
+          </div>
+          <div className="hud-eq" title={`${gotCount}/${SIGILS.length} symbols found`}>
+            {SIGILS.map((g) => (
+              <span key={g.id} className={'eq-ch' + (got[g.id] ? ' got' : '')}>
+                {g.s}
+              </span>
+            ))}
           </div>
         </div>
         <div className="arc-right">
@@ -301,18 +268,12 @@ export function World({
 
       <div className={'arc-hint' + (hintGone ? ' gone' : '')}>
         <kbd>←</kbd>
-        <kbd>→</kbd> walk · <kbd>Space</kbd> jump · <kbd>E</kbd> talk &amp; ride the lifts
+        <kbd>→</kbd> walk · <kbd>Space</kbd> jump · <kbd>E</kbd> ride the lifts &amp; open jewels
         <br />
-        hop the crates, use the purple pads, ride the sliding ledges — and pick up the 12 sigils
+        walk into a cave (or jump it) — find the jewel inside, then keep going to come out the other side
       </div>
 
       <TouchPad engine={engineRef} promptReady={!!prompt} />
-
-      <Dialogue
-        npc={talking}
-        onOpen={() => talking && openPanel(talking)}
-        onLater={endDialogue}
-      />
 
       <Panel npc={panelFor} onBack={closePanel} onExit={onExit} />
     </div>
