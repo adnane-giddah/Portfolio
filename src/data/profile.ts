@@ -238,7 +238,7 @@ export const PROJECTS: Project[] = [
     role: 'Founder & Developer',
     href: '#',
     desc: 'An interactive geography game centered on exploring the Earth — countries, flags, mountains, rivers, seas, oceans, tectonic plates, and volcanoes. Three complementary modes: Exploration, Game, and Learning (in active development).',
-    images: ['dist\\projects\\adnmission-home.png', 'dist\\projects\\adnmission-gameplay.png'],
+    images: ['projects/adnmission-home.png', 'projects/adnmission-gameplay.png'],
   },
   {
     years: '2026',
@@ -246,7 +246,7 @@ export const PROJECTS: Project[] = [
     role: 'Developer',
     href: '#',
     desc: 'A web platform for managing and evaluating mathematical olympiad problems, built with React and Node.js/Express. Automated evaluation scoring and vote weighting by evaluator profile, with structured data storage. Completed; not publicly deployed.',
-    images: ['dist\\projects\\amo-testing-admin.png', 'dist\\projects\\amo-testing-portal.png'],
+    images: ['projects/amo-testing-admin.png', 'projects/amo-testing-portal.png'],
   },
   {
     years: '2026',
