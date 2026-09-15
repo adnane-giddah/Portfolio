@@ -246,7 +246,7 @@ export const PROJECTS: Project[] = [
     role: 'Developer',
     href: '#',
     desc: 'A web platform for managing and evaluating mathematical olympiad problems, built with React and Node.js/Express. Automated evaluation scoring and vote weighting by evaluator profile, with structured data storage. Completed; not publicly deployed.',
-    images: ['projects/amo-testing-admin.png', 'projects/amo-testing-portal.png'],
+    images: ['projects/amo-testing-admin.png'],
   },
   {
     years: '2026',
@@ -341,7 +341,7 @@ export const CONTACT_LINKS: ContactLink[] = [
     value: 'ahmed-adnane.meddah@ensia.edu.dz',
     href: 'mailto:ahmed-adnane.meddah@ensia.edu.dz',
   },
-  { icon: '✆', label: 'Phone', value: '+213 780 20 23 80', href: 'tel:+213780202380' },
+  { icon: '✆', label: 'Phone', value: '+213 540 45 99 39', href: 'tel:+213540459939' },
   {
     icon: '⌥',
     label: 'GitHub',

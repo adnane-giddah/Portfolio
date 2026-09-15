@@ -98,7 +98,7 @@ export function World({
 
     const p = promptRef.current;
     if (!p) return;
-    if (window.matchMedia && window.matchMedia('(max-width:900px)').matches) {
+    if (window.matchMedia && window.matchMedia('(max-width:900px), (pointer:coarse)').matches) {
       p.style.top = mapTop + (map.offsetHeight || 20) + 12 + 'px';
       p.style.bottom = 'auto';
     } else {

@@ -61,7 +61,7 @@ export const SIGILS: Sigil[] = [
   { id: 'eq-i', f: 0, x: 1835, dy: 266, s: 'i' },
   { id: 'eq-pi', f: 1, x: 790, dy: 172, s: 'π' },
   { id: 'eq-plus', f: 1, x: 1260, dy: 242, s: '+' },
-  { id: 'eq-1', f: 2, x: 1170, dy: 172, s: '1' },
+  { id: 'eq-1', f: 2, x: 1920, dy: 172, s: '1' },
   { id: 'eq-eq', f: 2, x: 1995, dy: 172, s: '=' },
   { id: 'eq-0', f: 2, x: 2700, dy: 260, s: '0' },
 ];
