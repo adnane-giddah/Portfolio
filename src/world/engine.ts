@@ -24,6 +24,37 @@ export const PH = 42;
 
 const SYM = ['e', 'i', 'π', '+', '1', '=', '0'];
 
+// Physics runs at a fixed rate; drawing interpolates between the last two
+// steps, so motion stays smooth whatever the display's refresh rate.
+const STEP = 1 / 60;
+const MAX_STEPS = 5;
+
+// Distant ridgelines: one tileable period each, sampled once.
+const RIDGE_TILE = 1600;
+const RIDGES = [
+  { px: 0.08, py: 0.05, horizon: 0.5, amp: 74, seed: 1, top: '#221C3A', bot: '#16122A' },
+  { px: 0.18, py: 0.08, horizon: 0.57, amp: 60, seed: 2, top: '#16122A', bot: '#0F0D1C' },
+  { px: 0.32, py: 0.12, horizon: 0.63, amp: 48, seed: 3, top: '#0D0B17', bot: '#090810' },
+];
+
+function makeCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.ceil(w));
+  cv.height = Math.max(1, Math.ceil(h));
+  const x = cv.getContext('2d');
+  if (!x) throw new Error('2d canvas context unavailable');
+  return [cv, x];
+}
+
+/** White alpha shape → tinted copy, so one gradient serves every color. */
+function tint(cv: HTMLCanvasElement, x: CanvasRenderingContext2D, color: string) {
+  x.globalCompositeOperation = 'source-in';
+  x.fillStyle = color;
+  x.fillRect(0, 0, cv.width, cv.height);
+  x.globalCompositeOperation = 'source-over';
+  return cv;
+}
+
 function rnd(s: number) {
   const x = Math.sin(s * 12.9898) * 43758.5453;
   return x - Math.floor(x);
@@ -39,6 +70,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; life: number;
 interface TrailDot { x: number; y: number; t: number }
 interface Star { x: number; y: number; r: number; a: number }
 interface Mote { x: number; y: number; s: string; sc: number; a: number }
+interface Bokeh { x: number; y: number; r: number; a: number; sp: number; c: string }
 
 interface Ride { from: number; to: number; x: number; t: number; dur: number }
 
@@ -148,8 +180,31 @@ export class WorldEngine {
   private trail: TrailDot[] = [];
   private stars: Star[] = [];
   private motes: Mote[] = [];
+  private bokeh: Bokeh[] = [];
+  private ridges: number[][] = [];
   private raf = 0;
   private last = 0;
+  private acc = 0;
+  private alpha = 1;
+  private prev = { x: 0, y: 0, cx: 0, cy: 0, t: 0 };
+  private look = 0;
+
+  private host: HTMLElement | null = null;
+  private dprCap = 2;
+  private frameAvg = STEP;
+  private frameCount = 0;
+
+  // Sprites are resolution-independent and built once; `scaled` holds
+  // patterns and gradients tied to the canvas size and is dropped on resize.
+  private glows = new Map<string, HTMLCanvasElement>();
+  private strips = new Map<string, HTMLCanvasElement>();
+  private moteSprites = new Map<string, HTMLCanvasElement>();
+  private heroSprite: HTMLCanvasElement | null = null;
+  private scaled: {
+    hex: Map<string, CanvasPattern | string>;
+    sky?: CanvasGradient; vig?: CanvasGradient; caveSky?: CanvasGradient; caveVig?: CanvasGradient;
+    ridge: CanvasGradient[];
+  } = { hex: new Map(), ridge: [] };
   private promptKey: string | null = null;
 
   private ac: AudioContext | null | false = null;
@@ -173,6 +228,28 @@ export class WorldEngine {
         s: SYM[Math.floor(rnd(j + 13) * SYM.length)],
         sc: rnd(j + 77) * 20 + 15, a: rnd(j + 5) * 0.09 + 0.035,
       });
+    }
+    for (let k = 0; k < 22; k++) {
+      this.bokeh.push({
+        x: rnd(k + 211) * 1400, y: rnd(k + 307) * 800,
+        r: rnd(k + 401) * 16 + 6, a: rnd(k + 503) * 0.07 + 0.03,
+        sp: rnd(k + 601) * 10 + 4, c: rnd(k + 701) < 0.6 ? ACCENT : INK,
+      });
+    }
+    for (const R of RIDGES) {
+      const ph = [0, 1, 2, 3].map((i) => rnd(R.seed * 7 + i) * 6);
+      const pts: number[] = [];
+      for (let x = 0; x <= RIDGE_TILE; x += 16) {
+        const u = (x / RIDGE_TILE) * Math.PI * 2;
+        const y = 0.5 * Math.sin(u * 2 + ph[0]) + 0.28 * Math.sin(u * 5 + ph[1]) +
+          0.14 * Math.sin(u * 11 + ph[2]) + 0.06 * Math.sin(u * 23 + ph[3]);
+        pts.push(-(y * 0.5 + 0.5) * R.amp);
+      }
+      this.ridges.push(pts);
+    }
+    // Motes are text sprites; redraw them once the webfont has arrived.
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      void document.fonts.ready.then(() => this.moteSprites.clear());
     }
   }
 
@@ -216,9 +293,11 @@ export class WorldEngine {
 
 
   resize(host: HTMLElement) {
+    this.host = host;
+    this.scaled = { hex: new Map(), ridge: [] };
     this.W = host.clientWidth || window.innerWidth;
     this.H = host.clientHeight || window.innerHeight;
-    this.DPR = Math.min(window.devicePixelRatio || 1, 2);
+    this.DPR = Math.min(window.devicePixelRatio || 1, this.dprCap);
     this.cvs.width = Math.round(this.W * this.DPR);
     this.cvs.height = Math.round(this.H * this.DPR);
     this.cvs.style.width = this.W + 'px';
@@ -244,6 +323,7 @@ export class WorldEngine {
     this.ride = null;
     this.input.left = false; this.input.right = false;
     this.trail.length = 0; this.parts.length = 0;
+    this.look = 0;
     this.snapCam(1);
   }
 
@@ -251,6 +331,7 @@ export class WorldEngine {
     if (this.running) return;
     this.running = true;
     this.last = 0;
+    this.acc = 0;
     this.raf = requestAnimationFrame(this.frame);
   }
   stop() {
@@ -265,12 +346,42 @@ export class WorldEngine {
   private frame = (ts: number) => {
     if (!this.running) return;
     if (!this.last) this.last = ts;
-    const dt = Math.min(0.033, (ts - this.last) / 1000);
+    let el = (ts - this.last) / 1000;
     this.last = ts;
-    this.update(dt);
+    // A hidden tab or a long hitch: carry on rather than fast-forward.
+    if (el > 0.25 || el < 0) el = STEP;
+    this.acc += el;
+    let n = 0;
+    while (this.acc >= STEP && n < MAX_STEPS) {
+      this.savePrev();
+      this.update(STEP);
+      this.acc -= STEP;
+      n++;
+    }
+    if (n === MAX_STEPS) this.acc = 0;
+    this.alpha = clamp(this.acc / STEP, 0, 1);
+    this.tuneQuality(el);
     this.draw();
     this.raf = requestAnimationFrame(this.frame);
   };
+
+  private savePrev() {
+    const p = this.prev;
+    p.x = this.player.x; p.y = this.player.y;
+    p.cx = this.camX; p.cy = this.camY; p.t = this.t;
+  }
+
+  /** Fall back to 1x resolution if the device can't hold ~45fps at 2x. */
+  private tuneQuality(el: number) {
+    if (!this.host || this.DPR <= 1 || el > 0.1) return;
+    this.frameAvg = this.frameAvg * 0.95 + el * 0.05;
+    if (++this.frameCount < 150) return;
+    this.frameCount = 0;
+    if (this.frameAvg > 1 / 45) {
+      this.dprCap = 1;
+      this.resize(this.host);
+    }
+  }
 
 
   jump() {
@@ -608,7 +719,13 @@ export class WorldEngine {
       this.showPrompt(null);
     }
 
-    this.snapCam(1 - Math.pow(0.001, dt));
+    this.followCam(dt);
+  }
+
+  /** Soft follow with a little look-ahead in the direction of travel. */
+  private followCam(dt: number) {
+    this.look += ((this.player.vx / RUN) * 90 - this.look) * (1 - Math.pow(0.05, dt));
+    this.snapCam(1 - Math.pow(0.004, dt), 1 - Math.pow(0.003, dt));
   }
 
   private updateCave(dt: number) {
@@ -662,7 +779,7 @@ export class WorldEngine {
         : null);
     }
 
-    this.snapCaveCam(1 - Math.pow(0.001, dt));
+    this.snapCaveCam(1 - Math.pow(0.004, dt));
   }
 
   private showPrompt(p: PromptState | null) {
@@ -672,21 +789,21 @@ export class WorldEngine {
     this.cb.onPrompt(p);
   }
 
-  private snapCam(a?: number) {
-    let tx = this.player.x + PW / 2 - this.VW * 0.5;
+  private snapCam(a?: number, ay = a) {
+    let tx = this.player.x + PW / 2 + this.look - this.VW * 0.5;
     let ty = this.player.y + PH - this.VH * 0.66;
     const f0 = floorY(0); const f2 = floorY(2);
     ty = clamp(ty, f2 - this.VH * 0.66 - 190, f0 - this.VH * 0.66 + 120);
     tx = clamp(tx, FLOORS[0].x0 - 40, FLOORS[0].x1 - this.VW + 40);
-    if (a === undefined || a >= 1) { this.camX = tx; this.camY = ty; }
-    else { this.camX += (tx - this.camX) * a; this.camY += (ty - this.camY) * a; }
+    if (a === undefined || a >= 1) { this.camX = tx; this.camY = ty; this.savePrev(); }
+    else { this.camX += (tx - this.camX) * a; this.camY += (ty - this.camY) * (ay ?? a); }
   }
 
   private snapCaveCam(a?: number) {
     let tx = this.player.x + PW / 2 - this.VW * 0.5;
     tx = clamp(tx, -100, CORRIDOR_LEN - this.VW + 100);
     const ty = -this.VH * 0.66 + 120;
-    if (a === undefined || a >= 1) { this.camX = tx; this.camY = ty; }
+    if (a === undefined || a >= 1) { this.camX = tx; this.camY = ty; this.savePrev(); }
     else { this.camX += (tx - this.camX) * a; this.camY += (ty - this.camY) * a; }
   }
 
@@ -703,53 +820,123 @@ export class WorldEngine {
   }
 
 
+  // ── cached sprites ─────────────────────────────────────────────────────
+  // shadowBlur and per-frame gradients are the expensive parts of canvas 2D.
+  // Glows, lit edges, hex grids and the hero are drawn once into small
+  // canvases and stamped with drawImage / pattern fills from then on.
+
+  private glowSprite(color: string) {
+    let s = this.glows.get(color);
+    if (!s) {
+      const [cv, x] = makeCanvas(64, 64);
+      const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.2, 'rgba(255,255,255,0.62)');
+      g.addColorStop(0.45, 'rgba(255,255,255,0.24)');
+      g.addColorStop(0.7, 'rgba(255,255,255,0.07)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+      s = tint(cv, x, color);
+      this.glows.set(color, s);
+    }
+    return s;
+  }
+
+  /** Soft round light centred on (x, y). */
+  private glow(color: string, x: number, y: number, rx: number, a: number, ry = rx) {
+    if (a <= 0.003 || rx <= 0) return;
+    const c = this.ctx;
+    c.globalAlpha = Math.min(1, a);
+    c.drawImage(this.glowSprite(color), x - rx, y - ry, rx * 2, ry * 2);
+    c.globalAlpha = 1;
+  }
+
+  private stripSprite(color: string) {
+    let s = this.strips.get(color);
+    if (!s) {
+      const [cv, x] = makeCanvas(2, 64);
+      const g = x.createLinearGradient(0, 0, 0, 64);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.3, 'rgba(255,255,255,0.16)');
+      g.addColorStop(0.5, 'rgba(255,255,255,1)');
+      g.addColorStop(0.7, 'rgba(255,255,255,0.16)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 2, 64);
+      s = tint(cv, x, color);
+      this.strips.set(color, s);
+    }
+    return s;
+  }
+
+  /** A lit edge: solid core with a soft halo above and below. */
+  private glowLine(color: string, x: number, y: number, w: number, h: number, blur: number, a = 0.6) {
+    const c = this.ctx;
+    c.globalAlpha = a;
+    c.drawImage(this.stripSprite(color), x - blur * 0.4, y + h / 2 - blur, w + blur * 0.8, blur * 2);
+    c.globalAlpha = 1;
+    c.fillStyle = color;
+    c.fillRect(x, y, w, h);
+  }
+
   private static readonly HEX_UNIT = Array.from({ length: 6 }, (_, i) => {
     const a = (Math.PI / 180) * (60 * i - 90);
     return [Math.cos(a), Math.sin(a)] as const;
   });
 
+  /** A repeating hex-grid pattern, rendered at the canvas's real resolution. */
+  private hexFill(r: number, color: string, alpha: number): CanvasPattern | string {
+    const key = r + color + alpha;
+    const hit = this.scaled.hex.get(key);
+    if (hit) return hit;
+    const k = this.DPR * this.S;
+    const hS = r * Math.sqrt(3); const vS = r * 1.5;
+    const nx = Math.max(1, Math.round(96 / hS));
+    const ny = Math.max(1, Math.round(96 / (vS * 2)));
+    const tw = hS * nx; const th = vS * 2 * ny;
+    const [cv, x] = makeCanvas(Math.round(tw * k), Math.round(th * k));
+    const sx = cv.width / tw; const sy = cv.height / th;
+    x.scale(sx, sy);
+    x.strokeStyle = color; x.globalAlpha = alpha; x.lineWidth = 1;
+    x.beginPath();
+    const unit = WorldEngine.HEX_UNIT;
+    for (let row = -1; row <= ny * 2; row++) {
+      const cy = row * vS;
+      const off = Math.abs(row) % 2 ? hS / 2 : 0;
+      for (let col = -1; col <= nx; col++) {
+        const cx = col * hS + off;
+        for (let i = 0; i < 6; i++) {
+          const px = cx + r * unit[i][0]; const py = cy + r * unit[i][1];
+          if (i === 0) x.moveTo(px, py); else x.lineTo(px, py);
+        }
+        x.closePath();
+      }
+    }
+    x.stroke();
+    let fill: CanvasPattern | string = 'rgba(0,0,0,0)';
+    const pat = this.ctx.createPattern(cv, 'repeat');
+    if (pat && typeof DOMMatrix !== 'undefined' && pat.setTransform) {
+      pat.setTransform(new DOMMatrix([1 / sx, 0, 0, 1 / sy, 0, 0]));
+      fill = pat;
+    }
+    this.scaled.hex.set(key, fill);
+    return fill;
+  }
 
   private drawHexField(x: number, y: number, w: number, h: number, r: number, color: string, alpha: number) {
     const c = this.ctx;
-    const unit = WorldEngine.HEX_UNIT;
-    c.save();
-    c.beginPath(); c.rect(x, y, w, h); c.clip();
-    c.strokeStyle = color;
-    c.globalAlpha = alpha;
-    c.lineWidth = 1;
-    const hSpace = r * Math.sqrt(3);
-    const vSpace = r * 1.5;
-    const rows = Math.ceil(h / vSpace) + 2;
-    const cols = Math.ceil(w / hSpace) + 2;
-    c.beginPath();
-    for (let row = -1; row < rows; row++) {
-      const cy = y + row * vSpace;
-      const offset = Math.abs(row) % 2 ? hSpace / 2 : 0;
-      for (let col = -1; col < cols; col++) {
-        const cx = x + col * hSpace + offset;
-        for (let i = 0; i < 6; i++) {
-          const px = cx + r * unit[i][0]; const py = cy + r * unit[i][1];
-          if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
-        }
-        c.closePath();
-      }
-    }
-    c.stroke();
-    c.restore();
-    c.globalAlpha = 1;
+    c.fillStyle = this.hexFill(r, color, alpha);
+    c.fillRect(x, y, w, h);
   }
 
-  private drawPixelChar(originX: number, feetY: number, px: number, outline: string, alpha: number) {
-    const c = this.ctx;
-    c.globalAlpha = alpha;
-    const width = 14;
-    const left = originX - (width / 2) * px;
-    const top = feetY - PX_BODY.length * px;
-
+  /** The hero, painted once at 8px per cell and scaled at draw time. */
+  private heroCanvas() {
+    if (this.heroSprite) return this.heroSprite;
+    const C = 8;
+    const [cv, x] = makeCanvas(19 * C, 21 * C);
+    const left = 4 * C;
     const eyeSet = new Set(PX_EYES.map(([r, cc]) => r + ',' + cc));
     const sashSet = new Set(PX_SASH.map(([r, cc]) => r + ',' + cc));
     const bootSet = new Set(PX_BOOT_ROWS);
-
     for (let row = 0; row < PX_BODY.length; row++) {
       for (const [x0, x1] of PX_BODY[row]) {
         for (let col = x0; col <= x1; col++) {
@@ -759,48 +946,198 @@ export class WorldEngine {
           else if (eyeSet.has(key)) color = PX_PALETTE.W;
           else if (sashSet.has(key)) color = PX_PALETTE.H;
           else if (bootSet.has(row)) color = PX_PALETTE.K;
-          else if (col === x0 || col === x1) color = outline;
-          else color = col < width / 2 ? PX_PALETTE.D : PX_PALETTE.M;
-          c.fillStyle = color;
-          c.fillRect(left + col * px, top + row * px, px + 0.5, px + 0.5);
+          else if (col === x0 || col === x1) color = ACCENT;
+          else color = col < 7 ? PX_PALETTE.D : PX_PALETTE.M;
+          x.fillStyle = color;
+          x.fillRect(left + col * C, row * C, C, C);
         }
       }
     }
-
-    const lanternTop = top + 11 * px;
-    const lanternLeft = left - 4 * px;
     for (const [row, col, colKey] of PX_LANTERN) {
-      c.fillStyle = PX_PALETTE[colKey];
-      c.fillRect(lanternLeft + col * px, lanternTop + row * px, px + 0.5, px + 0.5);
+      x.fillStyle = PX_PALETTE[colKey];
+      x.fillRect(left - 4 * C + col * C, (11 + row) * C, C, C);
     }
-
-    const weaponTop = top + 16 * px;
-    const weaponLeft = left + 13 * px;
     for (const [row, col, colKey] of PX_WEAPON) {
-      c.fillStyle = PX_PALETTE[colKey];
-      c.fillRect(weaponLeft + col * px, weaponTop + row * px, px + 0.5, px + 0.5);
+      x.fillStyle = PX_PALETTE[colKey];
+      x.fillRect(left + (13 + col) * C, (16 + row) * C, C, C);
+    }
+    this.heroSprite = cv;
+    return cv;
+  }
+
+  private drawPixelChar(originX: number, feetY: number, px: number) {
+    this.ctx.drawImage(this.heroCanvas(), originX - 11 * px, feetY - 21 * px, 19 * px, 21 * px);
+  }
+
+  private moteSprite(s: string) {
+    let sp = this.moteSprites.get(s);
+    if (!sp) {
+      const [cv, x] = makeCanvas(96, 96);
+      x.fillStyle = ACCENT_DIM;
+      x.font = 'italic 64px "Instrument Serif", Georgia, serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText(s, 48, 48);
+      sp = cv;
+      this.moteSprites.set(s, sp);
+    }
+    return sp;
+  }
+
+  private onScreen(x0: number, x1: number, y0: number, y1: number) {
+    return x1 > this.camX - 80 && x0 < this.camX + this.VW + 80 &&
+      y1 > this.camY - 80 && y0 < this.camY + this.VH + 80;
+  }
+
+
+  // ── backdrop ───────────────────────────────────────────────────────────
+
+  private drawBackdrop() {
+    const c = this.ctx;
+    const VW = this.VW; const VH = this.VH;
+    const cx = this.camX; const t = this.t;
+    // 0 on the ground floor, negative as the camera climbs.
+    const dy = this.camY + VH * 0.66;
+
+    if (!this.scaled.sky) {
+      const g = c.createLinearGradient(0, 0, 0, VH);
+      g.addColorStop(0, '#05050B');
+      g.addColorStop(0.45, '#0B0A18');
+      g.addColorStop(1, '#1B1324');
+      this.scaled.sky = g;
+    }
+    c.fillStyle = this.scaled.sky;
+    c.fillRect(0, 0, VW, VH);
+
+    // Nebulae and the warm band on the horizon.
+    this.glow('#5B3FA8', VW * 0.26 - cx * 0.03 + Math.sin(t * 0.07) * 40, VH * 0.28 - dy * 0.03, VW * 0.5, 0.13, VW * 0.3);
+    this.glow('#1F6F80', VW * 0.8 - cx * 0.03 + Math.cos(t * 0.05) * 40, VH * 0.16 - dy * 0.03, VW * 0.38, 0.08, VW * 0.22);
+    this.glow(ACCENT, VW * 0.5, VH * 0.58 - dy * 0.05, VW * 0.85, 0.07, VH * 0.24);
+
+    // The moon.
+    const mx = VW * 0.82 - cx * 0.02; const my = VH * 0.17 - dy * 0.02;
+    this.glow(INK, mx, my, 170, 0.09);
+    this.glow(ACCENT, mx, my, 70, 0.12);
+    c.fillStyle = '#EFE6CF';
+    c.beginPath(); c.arc(mx, my, 17, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#07070F';
+    c.beginPath(); c.arc(mx + 7, my - 5, 15, 0, Math.PI * 2); c.fill();
+
+    // Stars.
+    c.fillStyle = '#CBD8FF';
+    for (let i = 0; i < this.stars.length; i++) {
+      const st = this.stars[i];
+      const sx = st.x - cx * 0.22;
+      const sy = st.y - this.camY * 0.22;
+      if (sx < -4 || sx > VW + 4 || sy < -4 || sy > VH + 4) continue;
+      c.globalAlpha = st.a * (0.65 + 0.35 * Math.sin(t * 1.4 + i));
+      const d = st.r * 1.7;
+      c.fillRect(sx - d / 2, sy - d / 2, d, d);
+    }
+    c.globalAlpha = 1;
+
+    // Ridgelines, far to near, each with a little haze at its foot.
+    const haze = this.stripSprite('#3A2E55');
+    for (let i = 0; i < RIDGES.length; i++) {
+      const R = RIDGES[i];
+      const base = VH * R.horizon - dy * R.py;
+      if (base - R.amp > VH) continue;
+      let g = this.scaled.ridge[i];
+      if (!g) {
+        g = c.createLinearGradient(0, -R.amp, 0, VH * 0.4);
+        g.addColorStop(0, R.top);
+        g.addColorStop(1, R.bot);
+        this.scaled.ridge[i] = g;
+      }
+      const pts = this.ridges[i];
+      const off = -((((cx * R.px) % RIDGE_TILE) + RIDGE_TILE) % RIDGE_TILE);
+      c.save();
+      c.translate(off, base);
+      c.fillStyle = g;
+      c.beginPath();
+      c.moveTo(0, VH * 2);
+      let lastX = 0;
+      for (let tile = 0; off + tile * RIDGE_TILE < VW; tile++) {
+        for (let j = 0; j < pts.length; j++) {
+          lastX = tile * RIDGE_TILE + j * 16;
+          c.lineTo(lastX, pts[j]);
+        }
+      }
+      c.lineTo(lastX, VH * 2);
+      c.closePath();
+      c.fill();
+      c.restore();
+      c.globalAlpha = 0.12;
+      c.drawImage(haze, 0, base - 34, VW, 68);
+      c.globalAlpha = 1;
     }
 
+    // Drifting symbols.
+    for (let m = 0; m < this.motes.length; m++) {
+      const mo = this.motes[m];
+      const mx2 = mo.x - cx * 0.4;
+      const my2 = mo.y - this.camY * 0.4 + Math.sin(t * 0.8 + m) * 7;
+      if (mx2 < -70 || mx2 > VW + 70 || my2 < -70 || my2 > VH + 70) continue;
+      const size = mo.sc * 1.5;
+      c.globalAlpha = mo.a;
+      c.drawImage(this.moteSprite(mo.s), mx2 - size / 2, my2 - size / 2, size, size);
+    }
     c.globalAlpha = 1;
   }
+
+  /** Out-of-focus specks in front of everything, for depth. */
+  private drawBokeh() {
+    const W = this.VW + 200; const H = this.VH + 200;
+    for (const b of this.bokeh) {
+      let x = (b.x - this.camX * 1.15) % W; if (x < 0) x += W;
+      let y = (b.y - this.camY * 1.15 - this.t * b.sp) % H; if (y < 0) y += H;
+      this.glow(b.c, x - 100, y - 100, b.r, b.a * (0.7 + 0.3 * Math.sin(this.t * 0.7 + b.x)));
+    }
+  }
+
+  private vignette(key: 'vig' | 'caveVig', inner: number, outer: number, a: number) {
+    const c = this.ctx;
+    let vg = this.scaled[key];
+    if (!vg) {
+      vg = c.createRadialGradient(
+        this.VW / 2, this.VH / 2, this.VH * inner,
+        this.VW / 2, this.VH / 2, this.VH * outer,
+      );
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(0,0,0,' + a + ')');
+      this.scaled[key] = vg;
+    }
+    c.fillStyle = vg;
+    c.fillRect(0, 0, this.VW, this.VH);
+  }
+
+
+  // ── world pieces ───────────────────────────────────────────────────────
+
+  private slabGrads: CanvasGradient[] = [];
 
   private drawFloorSlab(f: number) {
     const c = this.ctx;
     const F = FLOORS[f];
     const gy = F.y;
-    const g = c.createLinearGradient(0, gy, 0, gy + 150);
-    g.addColorStop(0, '#1B1226'); g.addColorStop(1, '#08090F');
+    const x0 = Math.max(F.x0 - 60, this.camX - 20);
+    const x1 = Math.min(F.x1 + 60, this.camX + this.VW + 20);
+    if (x1 <= x0 || !this.onScreen(x0, x1, gy - 20, gy + 380)) return;
+    const w = x1 - x0;
+
+    let g = this.slabGrads[f];
+    if (!g) {
+      g = c.createLinearGradient(0, gy, 0, gy + 150);
+      g.addColorStop(0, '#1B1226'); g.addColorStop(1, '#08090F');
+      this.slabGrads[f] = g;
+    }
     c.fillStyle = g;
-    c.fillRect(F.x0 - 60, gy, F.x1 - F.x0 + 120, 150);
+    c.fillRect(x0, gy, w, 150);
 
-    this.drawHexField(F.x0 - 60, gy, F.x1 - F.x0 + 120, 150, 20, '#F9DB08', 0.08);
+    this.drawHexField(x0, gy, w, 150, 20, ACCENT, 0.08);
+    this.drawHexField(x0, gy + 150, w, 380 - 150 - 6, 24, INK, 0.05);
 
-    c.shadowColor = '#F9DB08'; c.shadowBlur = 18;
-    c.fillStyle = '#F9DB08';
-    c.fillRect(F.x0 - 60, gy - 3, F.x1 - F.x0 + 120, 3.5);
-    c.shadowBlur = 0;
-
-    this.drawHexField(F.x0 - 60, gy + 150, F.x1 - F.x0 + 120, 380 - 150 - 6, 24, '#E8E0D8', 0.05);
+    this.glow(INK, (x0 + x1) / 2, gy - 6, w * 0.6, 0.035, 30);
+    this.glowLine(ACCENT, x0, gy - 3, w, 3.5, 22, 0.75);
 
     c.fillStyle = 'rgba(249,219,8,0.5)';
     c.font = '600 11px "DM Mono", monospace';
@@ -815,6 +1152,7 @@ export class WorldEngine {
     const c = this.ctx;
     const ya = floorY(L.a); const yb = floorY(L.b);
     const top = Math.min(ya, yb); const bot = Math.max(ya, yb);
+    if (!this.onScreen(L.x - 50, L.x + 50, top - 215, bot)) return;
     const g = c.createLinearGradient(L.x, top - 190, L.x, bot);
     g.addColorStop(0, 'rgba(232,224,216,0)');
     g.addColorStop(0.35, 'rgba(232,224,216,0.13)');
@@ -831,7 +1169,7 @@ export class WorldEngine {
     c.strokeStyle = INK; c.lineWidth = 2.5;
     for (let i = 0; i < 7; i++) {
       const yy = bot - ((this.t * 70 + i * 80) % (bot - top + 150));
-      c.globalAlpha = 0.16 + 0.3 * Math.sin(this.t * 3 + i);
+      c.globalAlpha = Math.max(0, 0.16 + 0.3 * Math.sin(this.t * 3 + i));
       c.beginPath();
       c.moveTo(L.x - 16, yy); c.lineTo(L.x, yy - 13); c.lineTo(L.x + 16, yy);
       c.stroke();
@@ -841,10 +1179,7 @@ export class WorldEngine {
     for (const y of [ya, yb]) {
       c.fillStyle = 'rgba(249,219,8,0.16)';
       this.rr(L.x - 46, y - 9, 92, 9, 3); c.fill();
-      c.fillStyle = ACCENT;
-      c.shadowColor = ACCENT; c.shadowBlur = 14;
-      c.fillRect(L.x - 46, y - 9, 92, 2.5);
-      c.shadowBlur = 0;
+      this.glowLine(ACCENT, L.x - 46, y - 9, 92, 2.5, 16);
     }
 
     c.fillStyle = 'rgba(232,224,216,0.7)';
@@ -853,23 +1188,29 @@ export class WorldEngine {
     c.fillText('LIFT', L.x, top - 202);
   }
 
+  private drawPlatform(x: number, y: number, w: number) {
+    const c = this.ctx;
+    c.fillStyle = '#16140f';
+    this.rr(x, y, w, 17, 4); c.fill();
+    this.glowLine(INK, x, y, w, 2.5, 13, 0.45);
+  }
+
   private drawCrate(cr: Crate) {
     const c = this.ctx;
     const y = floorY(cr.f) - cr.h;
+    if (!this.onScreen(cr.x, cr.x + cr.w, y, y + cr.h)) return;
     c.fillStyle = '#171618';
     this.rr(cr.x, y, cr.w, cr.h, 5); c.fill();
     c.strokeStyle = 'rgba(232,224,216,0.4)'; c.lineWidth = 1.6;
     this.rr(cr.x + 3, y + 3, cr.w - 6, cr.h - 6, 4); c.stroke();
-    this.drawHexField(cr.x + 3, y + 3, cr.w - 6, cr.h - 6, 9, '#E8E0D8', 0.22);
-    c.fillStyle = ACCENT_DIM;
-    c.shadowColor = ACCENT_DIM; c.shadowBlur = 8;
-    c.fillRect(cr.x, y, cr.w, 2.5);
-    c.shadowBlur = 0;
+    this.drawHexField(cr.x + 3, y + 3, cr.w - 6, cr.h - 6, 9, INK, 0.22);
+    this.glowLine(ACCENT_DIM, cr.x, y, cr.w, 2.5, 10, 0.5);
   }
 
   private drawPad(b: BouncePad) {
     const c = this.ctx;
     const y = floorY(b.f); const k = b.flash ?? 0; const lift = k * 7;
+    if (!this.onScreen(b.x, b.x + b.w, y - 100, y)) return;
     const g = c.createLinearGradient(0, y - 90, 0, y);
     g.addColorStop(0, 'rgba(249,219,8,0)');
     g.addColorStop(1, 'rgba(249,219,8,' + (0.13 + k * 0.3) + ')');
@@ -877,10 +1218,7 @@ export class WorldEngine {
 
     c.fillStyle = '#171410';
     this.rr(b.x, y - 13 - lift, b.w, 13 + lift, 5); c.fill();
-    c.fillStyle = ACCENT;
-    c.shadowColor = ACCENT; c.shadowBlur = 16 + k * 22;
-    c.fillRect(b.x, y - 13 - lift, b.w, 3);
-    c.shadowBlur = 0;
+    this.glowLine(ACCENT, b.x, y - 13 - lift, b.w, 3, 18 + k * 24, 0.65 + k * 0.35);
 
     c.strokeStyle = 'rgba(249,219,8,' + (0.4 + 0.35 * Math.sin(this.t * 4)) + ')';
     c.lineWidth = 2.4;
@@ -896,8 +1234,9 @@ export class WorldEngine {
 
   private drawMover(m: Mover) {
     const c = this.ctx;
-    const x = m.cx ?? this.moverX(m);
+    const x = this.moverX(m);
     const y = this.moverTop(m);
+    if (!this.onScreen(m.x0, m.x1 + m.w, y - 10, y + 20)) return;
     c.strokeStyle = 'rgba(232,224,216,0.13)'; c.lineWidth = 1.5;
     c.setLineDash([7, 9]);
     c.beginPath();
@@ -905,12 +1244,7 @@ export class WorldEngine {
     c.stroke();
     c.setLineDash([]);
 
-    c.fillStyle = '#16140f';
-    this.rr(x, y, m.w, 17, 4); c.fill();
-    c.fillStyle = INK;
-    c.shadowColor = INK; c.shadowBlur = 12;
-    c.fillRect(x, y, m.w, 2.5);
-    c.shadowBlur = 0;
+    this.drawPlatform(x, y, m.w);
     c.fillStyle = 'rgba(232,224,216,0.5)';
     c.font = '600 9px "DM Mono", monospace';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
@@ -922,12 +1256,9 @@ export class WorldEngine {
     if (this.got[g.id]) return;
     const c = this.ctx;
     const y = floorY(g.f) - g.dy + Math.sin(this.t * 2.1 + g.x) * 5;
+    if (!this.onScreen(g.x - 40, g.x + 40, y - 40, y + 40)) return;
     const pulse = 0.55 + 0.35 * Math.sin(this.t * 2.4 + g.x);
-    const rg = c.createRadialGradient(g.x, y, 2, g.x, y, 38);
-    rg.addColorStop(0, 'rgba(179,158,6,' + (0.24 * pulse) + ')');
-    rg.addColorStop(1, 'rgba(179,158,6,0)');
-    c.fillStyle = rg;
-    c.beginPath(); c.arc(g.x, y, 38, 0, Math.PI * 2); c.fill();
+    this.glow(ACCENT_DIM, g.x, y, 40, 0.3 * pulse);
 
     c.save();
     c.translate(g.x, y);
@@ -936,12 +1267,11 @@ export class WorldEngine {
     this.rr(-15, -15, 30, 30, 8); c.stroke();
     c.restore();
 
+    this.glow(ACCENT, g.x, y, 16, 0.22 * pulse);
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.font = '600 20px "DM Mono", monospace';
-    c.shadowColor = ACCENT_DIM; c.shadowBlur = 10 * pulse;
     c.fillStyle = '#D8C87A';
     c.fillText(g.s, g.x, y + 1);
-    c.shadowBlur = 0;
     c.textBaseline = 'alphabetic';
   }
 
@@ -959,17 +1289,14 @@ export class WorldEngine {
   private drawCave(n: Npc) {
     const c = this.ctx;
     const gy = floorY(n.f) - (n.dy ?? 0);
+    const x = n.x;
+    if (!this.onScreen(x - 120, x + 120, gy - 100, gy + 30)) return;
     const seen = !!this.found[n.id];
     const col = seen ? ACCENT : INK;
-    const x = n.x;
     const w = 120, h = 72;
     const left = x - w / 2, top = gy - h;
 
-    const pg = c.createRadialGradient(x, gy, 4, x, gy, 110);
-    pg.addColorStop(0, seen ? 'rgba(249,219,8,0.18)' : 'rgba(232,224,216,0.08)');
-    pg.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = pg;
-    c.beginPath(); c.ellipse(x, gy, 110, 30, 0, 0, Math.PI * 2); c.fill();
+    this.glow(col, x, gy, 120, seen ? 0.22 : 0.1, 32);
 
     this.caveArchPath(x, top, left, w, gy);
     c.closePath();
@@ -1004,12 +1331,10 @@ export class WorldEngine {
     c.closePath();
     c.fill();
 
+    this.glow(ACCENT, x, top + 6, 18, 0.55 + 0.15 * Math.sin(this.t * 3 + x));
     c.fillStyle = ACCENT;
-    c.shadowColor = ACCENT; c.shadowBlur = 10;
     c.beginPath(); c.arc(x, top + 6, 4.5, 0, Math.PI * 2); c.fill();
-    c.shadowBlur = 0;
 
-    c.globalAlpha = 1;
     c.font = '600 9px "DM Mono", monospace';
     c.fillStyle = seen ? col : 'rgba(232,224,216,0.45)';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
@@ -1021,17 +1346,28 @@ export class WorldEngine {
     }
   }
 
+  private drawHero(aura: boolean) {
+    const c = this.ctx;
+    c.save();
+    c.translate(this.player.x + PW / 2, this.player.y + PH / 2);
+    c.rotate(this.player.rot);
+    c.scale((1 + this.player.squash * 0.24) * this.player.facing, 1 - this.player.squash * 0.26);
+    if (aura) this.glow(ACCENT, 0, 0, 52, 0.32);
+    this.drawPixelChar(0, 17, 1.7);
+    c.restore();
+  }
+
   private drawCaveScene() {
     const c = this.ctx;
     const n = this.activeCave;
     const seen = !!(n && this.found[n.id]);
-    c.save();
-    c.scale(this.DPR * this.S, this.DPR * this.S);
-    c.clearRect(0, 0, this.VW, this.VH);
 
-    const sg = c.createLinearGradient(0, 0, 0, this.VH);
-    sg.addColorStop(0, '#120D08'); sg.addColorStop(1, '#050403');
-    c.fillStyle = sg; c.fillRect(0, 0, this.VW, this.VH);
+    if (!this.scaled.caveSky) {
+      const sg = c.createLinearGradient(0, 0, 0, this.VH);
+      sg.addColorStop(0, '#120D08'); sg.addColorStop(1, '#050403');
+      this.scaled.caveSky = sg;
+    }
+    c.fillStyle = this.scaled.caveSky; c.fillRect(0, 0, this.VW, this.VH);
 
     c.save();
     c.translate(-this.camX, -this.camY);
@@ -1041,21 +1377,16 @@ export class WorldEngine {
     c.fillRect(-100, top, CORRIDOR_LEN + 200, bot - top);
     this.drawHexField(-100, top, CORRIDOR_LEN + 200, bot - top, 13, INK, 0.07);
 
-    c.shadowColor = ACCENT; c.shadowBlur = 14;
-    c.fillStyle = ACCENT;
-    c.fillRect(-100, -2.5, CORRIDOR_LEN + 200, 3);
-    c.shadowBlur = 0;
+    this.glowLine(ACCENT, -100, -2.5, CORRIDOR_LEN + 200, 3, 18, 0.7);
 
     for (let tx = 70; tx < CORRIDOR_LEN; tx += 130) {
       const flick = 0.6 + 0.4 * Math.sin(this.t * 6 + tx);
-      c.fillStyle = 'rgba(249,219,8,0.10)';
-      c.beginPath(); c.arc(tx, -150, 46 * flick, 0, Math.PI * 2); c.fill();
+      this.glow(ACCENT, tx, -150, 70 * (0.85 + flick * 0.15), 0.16 + flick * 0.06);
       c.fillStyle = '#0C0A08';
       this.rr(tx - 4, -168, 8, 42, 3); c.fill();
+      this.glow(ACCENT, tx, -172, 18 * flick, 0.75);
       c.fillStyle = ACCENT;
-      c.shadowColor = ACCENT; c.shadowBlur = 16 * flick;
       c.beginPath(); c.arc(tx, -172, 5 * flick, 0, Math.PI * 2); c.fill();
-      c.shadowBlur = 0;
     }
 
     for (const ex of [0, CORRIDOR_LEN]) {
@@ -1067,21 +1398,16 @@ export class WorldEngine {
       const jy = -30 + Math.sin(this.t * 2) * 4;
       const pulse = 0.6 + 0.4 * Math.sin(this.t * 2.4);
       const col = seen ? ACCENT : INK;
-      const jg = c.createRadialGradient(JEWEL_X, jy, 2, JEWEL_X, jy, 64);
-      jg.addColorStop(0, 'rgba(249,219,8,' + (0.32 * pulse) + ')');
-      jg.addColorStop(1, 'rgba(249,219,8,0)');
-      c.fillStyle = jg;
-      c.beginPath(); c.arc(JEWEL_X, jy, 64, 0, Math.PI * 2); c.fill();
+      this.glow(ACCENT, JEWEL_X, jy, 70, 0.4 * pulse);
+      this.glow(ACCENT, JEWEL_X, jy, 24, 0.5 * pulse);
 
       c.save();
       c.translate(JEWEL_X, jy);
       c.rotate(Math.PI / 4 + Math.sin(this.t * 1.4) * 0.08);
       c.fillStyle = col;
-      c.shadowColor = ACCENT; c.shadowBlur = 18 * pulse;
       c.fillRect(-9, -9, 18, 18);
       c.strokeStyle = '#0B0A08'; c.lineWidth = 1.4;
       c.strokeRect(-9, -9, 18, 18);
-      c.shadowBlur = 0;
       c.restore();
 
       c.textAlign = 'center'; c.textBaseline = 'alphabetic';
@@ -1095,62 +1421,15 @@ export class WorldEngine {
       }
     }
 
-    c.save();
-    c.translate(this.player.x + PW / 2, this.player.y + PH / 2);
-    c.rotate(this.player.rot);
-    c.scale((1 + this.player.squash * 0.24) * this.player.facing, 1 - this.player.squash * 0.26);
-    this.drawPixelChar(0, 17, 1.7, ACCENT, 1);
-    c.restore();
+    this.drawHero(false);
 
     c.restore();
-
-    const vg = c.createRadialGradient(
-      this.VW / 2, this.VH / 2, this.VH * 0.3,
-      this.VW / 2, this.VH / 2, this.VH * 0.9,
-    );
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.6)');
-    c.fillStyle = vg;
-    c.fillRect(0, 0, this.VW, this.VH);
-
-    c.restore();
+    this.vignette('caveVig', 0.3, 0.9, 0.6);
   }
 
-  private draw() {
-    if (this.view !== 'world') { this.drawCaveScene(); return; }
+  private drawWorld() {
     const c = this.ctx;
-    c.save();
-    c.scale(this.DPR * this.S, this.DPR * this.S);
-    c.clearRect(0, 0, this.VW, this.VH);
-
-
-    const sg = c.createLinearGradient(0, 0, 0, this.VH);
-    sg.addColorStop(0, '#0A0912'); sg.addColorStop(1, '#06070C');
-    c.fillStyle = sg; c.fillRect(0, 0, this.VW, this.VH);
-
-    for (let i = 0; i < this.stars.length; i++) {
-      const st = this.stars[i];
-      const sx = st.x - this.camX * 0.22;
-      const sy = st.y - this.camY * 0.22;
-      if (sx < -20 || sx > this.VW + 20 || sy < -20 || sy > this.VH + 20) continue;
-      c.globalAlpha = st.a * (0.65 + 0.35 * Math.sin(this.t * 1.4 + i));
-      c.fillStyle = '#CBD8FF';
-      c.beginPath(); c.arc(sx, sy, st.r, 0, Math.PI * 2); c.fill();
-    }
-    c.globalAlpha = 1;
-
-    c.textAlign = 'center'; c.textBaseline = 'middle';
-    for (let m = 0; m < this.motes.length; m++) {
-      const mo = this.motes[m];
-      const mx = mo.x - this.camX * 0.4;
-      const my = mo.y - this.camY * 0.4 + Math.sin(this.t * 0.8 + m) * 7;
-      if (mx < -70 || mx > this.VW + 70 || my < -70 || my > this.VH + 70) continue;
-      c.globalAlpha = mo.a;
-      c.fillStyle = ACCENT_DIM;
-      c.font = 'italic ' + mo.sc + 'px "Instrument Serif", Georgia, serif';
-      c.fillText(mo.s, mx, my);
-    }
-    c.globalAlpha = 1;
+    this.drawBackdrop();
 
     c.save();
     c.translate(-this.camX, -this.camY);
@@ -1173,12 +1452,7 @@ export class WorldEngine {
 
     for (const pl of PLATS) {
       const ty = floorY(pl.f) - pl.dy;
-      c.fillStyle = '#16140f';
-      this.rr(pl.x, ty, pl.w, 17, 4); c.fill();
-      c.fillStyle = INK;
-      c.shadowColor = INK; c.shadowBlur = 12;
-      c.fillRect(pl.x, ty, pl.w, 2.5);
-      c.shadowBlur = 0;
+      if (this.onScreen(pl.x, pl.x + pl.w, ty, ty + 17)) this.drawPlatform(pl.x, ty, pl.w);
     }
 
     for (const b of BPADS) this.drawPad(b);
@@ -1195,44 +1469,44 @@ export class WorldEngine {
     }
     c.globalAlpha = 1;
 
+    c.fillStyle = ACCENT;
     for (let ti = 0; ti < this.trail.length; ti++) {
       const tr = this.trail[ti];
       c.globalAlpha = (ti / this.trail.length) * 0.4 * Math.max(0, 1 - tr.t * 1.6);
-      c.fillStyle = '#F9DB08';
       c.beginPath();
       c.arc(tr.x, tr.y, 3 + (ti / this.trail.length) * 6, 0, Math.PI * 2);
       c.fill();
     }
     c.globalAlpha = 1;
 
+    this.drawHero(true);
+
+    c.restore();
+
+    this.drawBokeh();
+    this.vignette('vig', 0.34, 0.95, 0.55);
+  }
+
+  /** Draws the scene as it stood `alpha` of the way between the last two steps. */
+  private draw() {
+    const c = this.ctx;
+    const p = this.player; const pv = this.prev; const a = this.alpha;
+    const real = { x: p.x, y: p.y, cx: this.camX, cy: this.camY, t: this.t };
+    p.x = pv.x + (real.x - pv.x) * a;
+    p.y = pv.y + (real.y - pv.y) * a;
+    this.camX = pv.cx + (real.cx - pv.cx) * a;
+    this.camY = pv.cy + (real.cy - pv.cy) * a;
+    this.t = pv.t + (real.t - pv.t) * a;
 
     c.save();
-    c.translate(this.player.x + PW / 2, this.player.y + PH / 2);
-    c.rotate(this.player.rot);
-    c.scale((1 + this.player.squash * 0.24) * this.player.facing, 1 - this.player.squash * 0.26);
-
-    const au = c.createRadialGradient(0, 0, 2, 0, 0, 46);
-    au.addColorStop(0, 'rgba(249,219,8,0.30)');
-    au.addColorStop(1, 'rgba(249,219,8,0)');
-    c.fillStyle = au;
-    c.beginPath(); c.arc(0, 0, 46, 0, Math.PI * 2); c.fill();
-
-
-    this.drawPixelChar(0, 17, 1.7, ACCENT, 1);
-
-    c.restore();
-
-    c.restore();
-
-    const vg = c.createRadialGradient(
-      this.VW / 2, this.VH / 2, this.VH * 0.34,
-      this.VW / 2, this.VH / 2, this.VH * 0.95,
-    );
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.55)');
-    c.fillStyle = vg;
-    c.fillRect(0, 0, this.VW, this.VH);
-
-    c.restore();
+    c.scale(this.DPR * this.S, this.DPR * this.S);
+    try {
+      if (this.view === 'world') this.drawWorld();
+      else this.drawCaveScene();
+    } finally {
+      c.restore();
+      p.x = real.x; p.y = real.y;
+      this.camX = real.cx; this.camY = real.cy; this.t = real.t;
+    }
   }
 }

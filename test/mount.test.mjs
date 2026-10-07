@@ -43,10 +43,11 @@ window.HTMLCanvasElement.prototype.getContext = function () {
     'save', 'restore', 'beginPath', 'moveTo', 'lineTo', 'arc', 'arcTo', 'ellipse',
     'closePath', 'fill', 'stroke', 'fillRect', 'clearRect', 'rect', 'clip',
     'translate', 'rotate', 'scale', 'fillText', 'strokeText', 'quadraticCurveTo',
-    'setLineDash',
+    'setLineDash', 'drawImage',
   ]) o[n] = noop;
   o.createLinearGradient = o.createRadialGradient = () => ({ addColorStop: noop });
   o.measureText = (t) => ({ width: String(t).length * 6 });
+  o.createPattern = () => ({ setTransform: noop });
   return o;
 };
 
