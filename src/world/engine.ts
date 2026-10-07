@@ -199,12 +199,13 @@ export class WorldEngine {
   private glows = new Map<string, HTMLCanvasElement>();
   private strips = new Map<string, HTMLCanvasElement>();
   private moteSprites = new Map<string, HTMLCanvasElement>();
+  private grads = new Map<string, CanvasGradient>();
   private heroSprite: HTMLCanvasElement | null = null;
   private scaled: {
-    hex: Map<string, CanvasPattern | string>;
+    fills: Map<string, CanvasPattern | string>;
     sky?: CanvasGradient; vig?: CanvasGradient; caveSky?: CanvasGradient; caveVig?: CanvasGradient;
     ridge: CanvasGradient[];
-  } = { hex: new Map(), ridge: [] };
+  } = { fills: new Map(), ridge: [] };
   private promptKey: string | null = null;
 
   private ac: AudioContext | null | false = null;
@@ -294,7 +295,7 @@ export class WorldEngine {
 
   resize(host: HTMLElement) {
     this.host = host;
-    this.scaled = { hex: new Map(), ridge: [] };
+    this.scaled = { fills: new Map(), ridge: [] };
     this.W = host.clientWidth || window.innerWidth;
     this.H = host.clientHeight || window.innerHeight;
     this.DPR = Math.min(window.devicePixelRatio || 1, this.dprCap);
@@ -878,54 +879,48 @@ export class WorldEngine {
     c.fillRect(x, y, w, h);
   }
 
-  private static readonly HEX_UNIT = Array.from({ length: 6 }, (_, i) => {
-    const a = (Math.PI / 180) * (60 * i - 90);
-    return [Math.cos(a), Math.sin(a)] as const;
-  });
-
-  /** A repeating hex-grid pattern, rendered at the canvas's real resolution. */
-  private hexFill(r: number, color: string, alpha: number): CanvasPattern | string {
-    const key = r + color + alpha;
-    const hit = this.scaled.hex.get(key);
+  /**
+   * Running-bond stone courses as a repeating pattern, rendered at the
+   * canvas's real resolution: a dark joint with a faint highlight under it.
+   */
+  private stoneFill(course: number, block: number, alpha: number): CanvasPattern | string {
+    const key = course + ':' + block + ':' + alpha;
+    const hit = this.scaled.fills.get(key);
     if (hit) return hit;
     const k = this.DPR * this.S;
-    const hS = r * Math.sqrt(3); const vS = r * 1.5;
-    const nx = Math.max(1, Math.round(96 / hS));
-    const ny = Math.max(1, Math.round(96 / (vS * 2)));
-    const tw = hS * nx; const th = vS * 2 * ny;
+    const tw = block; const th = course * 2;
     const [cv, x] = makeCanvas(Math.round(tw * k), Math.round(th * k));
     const sx = cv.width / tw; const sy = cv.height / th;
     x.scale(sx, sy);
-    x.strokeStyle = color; x.globalAlpha = alpha; x.lineWidth = 1;
-    x.beginPath();
-    const unit = WorldEngine.HEX_UNIT;
-    for (let row = -1; row <= ny * 2; row++) {
-      const cy = row * vS;
-      const off = Math.abs(row) % 2 ? hS / 2 : 0;
-      for (let col = -1; col <= nx; col++) {
-        const cx = col * hS + off;
-        for (let i = 0; i < 6; i++) {
-          const px = cx + r * unit[i][0]; const py = cy + r * unit[i][1];
-          if (i === 0) x.moveTo(px, py); else x.lineTo(px, py);
-        }
-        x.closePath();
-      }
+    for (let row = 0; row < 2; row++) {
+      const y = row * course;
+      const seam = row ? block / 2 : 0;
+      x.fillStyle = 'rgba(0,0,0,' + alpha * 3 + ')';
+      x.fillRect(0, y, tw, 1.2);
+      x.fillRect(seam, y, 1.2, course);
+      x.fillStyle = 'rgba(232,224,216,' + alpha + ')';
+      x.fillRect(0, y + 1.2, tw, 1);
+      x.fillRect(seam + 1.2, y + 1.2, 1, course - 1.2);
     }
-    x.stroke();
     let fill: CanvasPattern | string = 'rgba(0,0,0,0)';
     const pat = this.ctx.createPattern(cv, 'repeat');
     if (pat && typeof DOMMatrix !== 'undefined' && pat.setTransform) {
       pat.setTransform(new DOMMatrix([1 / sx, 0, 0, 1 / sy, 0, 0]));
       fill = pat;
     }
-    this.scaled.hex.set(key, fill);
+    this.scaled.fills.set(key, fill);
     return fill;
   }
 
-  private drawHexField(x: number, y: number, w: number, h: number, r: number, color: string, alpha: number) {
-    const c = this.ctx;
-    c.fillStyle = this.hexFill(r, color, alpha);
-    c.fillRect(x, y, w, h);
+  /** A vertical gradient in local coordinates, made once and reused under translate(). */
+  private vGrad(key: string, h: number, stops: [number, string][]) {
+    let g = this.grads.get(key);
+    if (!g) {
+      g = this.ctx.createLinearGradient(0, 0, 0, h);
+      for (const [o, col] of stops) g.addColorStop(o, col);
+      this.grads.set(key, g);
+    }
+    return g;
   }
 
   /** The hero, painted once at 8px per cell and scaled at draw time. */
@@ -1014,13 +1009,17 @@ export class WorldEngine {
     this.glow(ACCENT, VW * 0.5, VH * 0.58 - dy * 0.05, VW * 0.85, 0.07, VH * 0.24);
 
     // The moon.
-    const mx = VW * 0.82 - cx * 0.02; const my = VH * 0.17 - dy * 0.02;
-    this.glow(INK, mx, my, 170, 0.09);
-    this.glow(ACCENT, mx, my, 70, 0.12);
+    const mx = VW * 0.64 - cx * 0.02; const my = VH * 0.2 - dy * 0.02;
+    this.glow(INK, mx, my, 190, 0.1);
+    this.glow(ACCENT, mx, my, 64, 0.16);
     c.fillStyle = '#EFE6CF';
-    c.beginPath(); c.arc(mx, my, 17, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#07070F';
-    c.beginPath(); c.arc(mx + 7, my - 5, 15, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(mx, my, 18, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(160,148,128,0.35)';
+    c.beginPath();
+    c.arc(mx - 6, my - 4, 4.5, 0, Math.PI * 2);
+    c.moveTo(mx + 9, my + 5); c.arc(mx + 6, my + 5, 3, 0, Math.PI * 2);
+    c.moveTo(mx + 5, my - 8); c.arc(mx + 3, my - 8, 2, 0, Math.PI * 2);
+    c.fill();
 
     // Stars.
     c.fillStyle = '#CBD8FF';
@@ -1113,73 +1112,103 @@ export class WorldEngine {
 
   // ── world pieces ───────────────────────────────────────────────────────
 
-  private slabGrads: CanvasGradient[] = [];
-
+  /** Each floor is a floating stone shelf: lit lip, coursed face, soft underside. */
   private drawFloorSlab(f: number) {
     const c = this.ctx;
     const F = FLOORS[f];
     const gy = F.y;
     const x0 = Math.max(F.x0 - 60, this.camX - 20);
     const x1 = Math.min(F.x1 + 60, this.camX + this.VW + 20);
-    if (x1 <= x0 || !this.onScreen(x0, x1, gy - 20, gy + 380)) return;
+    if (x1 <= x0 || !this.onScreen(x0, x1, gy - 20, gy + 200)) return;
     const w = x1 - x0;
 
-    let g = this.slabGrads[f];
-    if (!g) {
-      g = c.createLinearGradient(0, gy, 0, gy + 150);
-      g.addColorStop(0, '#1B1226'); g.addColorStop(1, '#08090F');
-      this.slabGrads[f] = g;
-    }
-    c.fillStyle = g;
-    c.fillRect(x0, gy, w, 150);
+    c.save();
+    c.translate(0, gy);
+    c.fillStyle = this.vGrad('slab', 200, [
+      [0, '#2C2339'], [0.05, '#211A2D'], [0.4, '#130F1C'], [0.75, '#0A0910'], [1, 'rgba(8,8,14,0)'],
+    ]);
+    c.fillRect(x0, 0, w, 200);
+    c.restore();
 
-    this.drawHexField(x0, gy, w, 150, 20, ACCENT, 0.08);
-    this.drawHexField(x0, gy + 150, w, 380 - 150 - 6, 24, INK, 0.05);
+    c.fillStyle = this.stoneFill(26, 150, 0.035);
+    c.fillRect(x0, gy + 12, w, 110);
+    c.fillStyle = this.vGrad('slabFade', 110, [[0, 'rgba(19,15,28,0)'], [1, 'rgba(10,9,16,1)']]);
+    c.save(); c.translate(0, gy + 12); c.fillRect(x0, 0, w, 110); c.restore();
 
-    this.glow(INK, (x0 + x1) / 2, gy - 6, w * 0.6, 0.035, 30);
-    this.glowLine(ACCENT, x0, gy - 3, w, 3.5, 22, 0.75);
+    // The lip: a bright cap, then a shadow line where the face begins.
+    c.fillStyle = 'rgba(232,224,216,0.07)';
+    c.fillRect(x0, gy, w, 9);
+    c.fillStyle = 'rgba(0,0,0,0.45)';
+    c.fillRect(x0, gy + 9, w, 2);
+
+    this.glow(ACCENT, (x0 + x1) / 2, gy - 4, w * 0.6, 0.05, 26);
+    this.glowLine(ACCENT, x0, gy - 2.5, w, 2.5, 20, 0.7);
 
     c.fillStyle = 'rgba(249,219,8,0.5)';
     c.font = '600 11px "DM Mono", monospace';
     c.textAlign = 'left'; c.textBaseline = 'alphabetic';
-    c.fillText('FLOOR ' + (f + 1) + ' — ' + F.name, F.x0 + 74, gy + 34);
-    c.fillStyle = 'rgba(232,224,216,0.22)';
+    c.fillText('FLOOR ' + (f + 1) + ' — ' + F.name, F.x0 + 74, gy + 36);
+    c.fillStyle = 'rgba(232,224,216,0.25)';
     c.font = '9px "DM Mono", monospace';
-    c.fillText(F.sub.toUpperCase(), F.x0 + 74, gy + 50);
+    c.fillText(F.sub.toUpperCase(), F.x0 + 74, gy + 52);
   }
 
   private drawLift(L: { x: number; a: number; b: number }) {
     const c = this.ctx;
     const ya = floorY(L.a); const yb = floorY(L.b);
     const top = Math.min(ya, yb); const bot = Math.max(ya, yb);
-    if (!this.onScreen(L.x - 50, L.x + 50, top - 215, bot)) return;
-    const g = c.createLinearGradient(L.x, top - 190, L.x, bot);
-    g.addColorStop(0, 'rgba(232,224,216,0)');
-    g.addColorStop(0.35, 'rgba(232,224,216,0.13)');
-    g.addColorStop(1, 'rgba(232,224,216,0.04)');
+    if (!this.onScreen(L.x - 60, L.x + 60, top - 215, bot)) return;
+
+    // The beam of light.
+    const g = c.createLinearGradient(0, top - 190, 0, bot);
+    g.addColorStop(0, 'rgba(249,219,8,0)');
+    g.addColorStop(0.35, 'rgba(249,219,8,0.07)');
+    g.addColorStop(1, 'rgba(249,219,8,0.02)');
     c.fillStyle = g;
-    c.fillRect(L.x - 42, top - 190, 84, bot - top + 190);
+    c.fillRect(L.x - 38, top - 190, 76, bot - top + 190);
+    this.glow(ACCENT, L.x, (top + bot) / 2, 70, 0.05, (bot - top) * 0.7);
 
-    c.strokeStyle = 'rgba(232,224,216,0.4)'; c.lineWidth = 2;
-    c.beginPath();
-    c.moveTo(L.x - 42, bot); c.lineTo(L.x - 42, top - 190);
-    c.moveTo(L.x + 42, bot); c.lineTo(L.x + 42, top - 190);
-    c.stroke();
+    // Rails, with faint rungs.
+    const rail = c.createLinearGradient(0, top - 190, 0, bot);
+    rail.addColorStop(0, 'rgba(232,224,216,0)');
+    rail.addColorStop(0.3, 'rgba(232,224,216,0.45)');
+    rail.addColorStop(1, 'rgba(232,224,216,0.3)');
+    c.fillStyle = rail;
+    c.fillRect(L.x - 44, top - 190, 3, bot - top + 190);
+    c.fillRect(L.x + 41, top - 190, 3, bot - top + 190);
+    c.fillStyle = 'rgba(232,224,216,0.07)';
+    for (let yy = bot - 30; yy > top - 160; yy -= 30) {
+      c.fillRect(L.x - 41, yy, 6, 1.5);
+      c.fillRect(L.x + 35, yy, 6, 1.5);
+    }
 
-    c.strokeStyle = INK; c.lineWidth = 2.5;
+    // Chevrons climbing the shaft.
+    c.strokeStyle = INK; c.lineWidth = 2.5; c.lineCap = 'round'; c.lineJoin = 'round';
     for (let i = 0; i < 7; i++) {
       const yy = bot - ((this.t * 70 + i * 80) % (bot - top + 150));
       c.globalAlpha = Math.max(0, 0.16 + 0.3 * Math.sin(this.t * 3 + i));
       c.beginPath();
-      c.moveTo(L.x - 16, yy); c.lineTo(L.x, yy - 13); c.lineTo(L.x + 16, yy);
+      c.moveTo(L.x - 14, yy); c.lineTo(L.x, yy - 12); c.lineTo(L.x + 14, yy);
       c.stroke();
     }
     c.globalAlpha = 1;
+    c.lineCap = 'butt'; c.lineJoin = 'miter';
 
+    // Landing plates, with lamp posts.
     for (const y of [ya, yb]) {
-      c.fillStyle = 'rgba(249,219,8,0.16)';
-      this.rr(L.x - 46, y - 9, 92, 9, 3); c.fill();
-      this.glowLine(ACCENT, L.x - 46, y - 9, 92, 2.5, 16);
+      c.save();
+      c.translate(0, y - 10);
+      c.fillStyle = this.vGrad('liftPlate', 10, [[0, '#3A3044'], [1, '#17131D']]);
+      this.rr(L.x - 48, 0, 96, 10, 4); c.fill();
+      c.restore();
+      this.glowLine(ACCENT, L.x - 45, y - 10, 90, 2, 16, 0.7);
+      for (const px of [L.x - 44, L.x + 44]) {
+        c.fillStyle = '#221C28';
+        c.fillRect(px - 1.5, y - 34, 3, 24);
+        this.glow(ACCENT, px, y - 36, 12, 0.6 + 0.2 * Math.sin(this.t * 2 + px));
+        c.fillStyle = ACCENT;
+        c.beginPath(); c.arc(px, y - 36, 2.4, 0, Math.PI * 2); c.fill();
+      }
     }
 
     c.fillStyle = 'rgba(232,224,216,0.7)';
@@ -1188,89 +1217,165 @@ export class WorldEngine {
     c.fillText('LIFT', L.x, top - 202);
   }
 
-  private drawPlatform(x: number, y: number, w: number) {
+  /** A floating ledge: bevelled stone with a lit edge and glowing end studs. */
+  private drawPlatform(x: number, y: number, w: number, edge = INK) {
     const c = this.ctx;
-    c.fillStyle = '#16140f';
-    this.rr(x, y, w, 17, 4); c.fill();
-    this.glowLine(INK, x, y, w, 2.5, 13, 0.45);
+    this.glow(edge, x + w / 2, y + 20, w * 0.55, 0.05, 12);
+    c.save();
+    c.translate(x, y);
+    c.fillStyle = this.vGrad('plat', 17, [[0, '#3B3346'], [0.45, '#221C2B'], [1, '#121017']]);
+    this.rr(0, 0, w, 17, 6); c.fill();
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    c.fillRect(6, 13, w - 12, 1.5);
+    c.restore();
+    this.glowLine(edge, x + 4, y, w - 8, 2, 12, 0.45);
+    c.fillStyle = edge;
+    c.globalAlpha = 0.7;
+    c.beginPath();
+    c.arc(x + 9, y + 9, 1.8, 0, Math.PI * 2);
+    c.arc(x + w - 9, y + 9, 1.8, 0, Math.PI * 2);
+    c.fill();
+    c.globalAlpha = 1;
   }
 
+  /** A riveted cargo box; tall stacks read as two boxes. */
   private drawCrate(cr: Crate) {
     const c = this.ctx;
     const y = floorY(cr.f) - cr.h;
     if (!this.onScreen(cr.x, cr.x + cr.w, y, y + cr.h)) return;
-    c.fillStyle = '#171618';
-    this.rr(cr.x, y, cr.w, cr.h, 5); c.fill();
-    c.strokeStyle = 'rgba(232,224,216,0.4)'; c.lineWidth = 1.6;
-    this.rr(cr.x + 3, y + 3, cr.w - 6, cr.h - 6, 4); c.stroke();
-    this.drawHexField(cr.x + 3, y + 3, cr.w - 6, cr.h - 6, 9, INK, 0.22);
-    this.glowLine(ACCENT_DIM, cr.x, y, cr.w, 2.5, 10, 0.5);
+    c.save();
+    c.translate(cr.x, y);
+    for (let by = 0; by < cr.h; by += 56) {
+      const bh = Math.min(56, cr.h - by);
+      c.save();
+      c.translate(0, by);
+      c.fillStyle = this.vGrad('crate', 56, [[0, '#342C3C'], [1, '#17131C']]);
+      this.rr(0.5, 0.5, cr.w - 1, bh - 1, 5); c.fill();
+      c.strokeStyle = 'rgba(232,224,216,0.14)'; c.lineWidth = 1.4;
+      this.rr(5, 5, cr.w - 10, bh - 10, 3); c.stroke();
+      c.strokeStyle = 'rgba(232,224,216,0.08)'; c.lineWidth = 3;
+      c.beginPath();
+      c.moveTo(9, bh - 9); c.lineTo(cr.w - 9, 9);
+      c.stroke();
+      c.fillStyle = 'rgba(249,219,8,0.5)';
+      for (const [bx, byy] of [[9, 9], [cr.w - 9, 9], [9, bh - 9], [cr.w - 9, bh - 9]]) {
+        c.fillRect(bx - 1.3, byy - 1.3, 2.6, 2.6);
+      }
+      c.restore();
+    }
+    c.restore();
+    this.glowLine(ACCENT_DIM, cr.x + 3, y, cr.w - 6, 2, 10, 0.5);
   }
 
+  /** A spring pad: base, coil and a plate that kicks up when used. */
   private drawPad(b: BouncePad) {
     const c = this.ctx;
-    const y = floorY(b.f); const k = b.flash ?? 0; const lift = k * 7;
-    if (!this.onScreen(b.x, b.x + b.w, y - 100, y)) return;
-    const g = c.createLinearGradient(0, y - 90, 0, y);
+    const y = floorY(b.f); const k = b.flash ?? 0; const lift = k * 9;
+    if (!this.onScreen(b.x, b.x + b.w, y - 110, y)) return;
+    const plateY = y - 24 - lift;
+    const cx = b.x + b.w / 2;
+
+    const g = c.createLinearGradient(0, y - 100, 0, y);
     g.addColorStop(0, 'rgba(249,219,8,0)');
-    g.addColorStop(1, 'rgba(249,219,8,' + (0.13 + k * 0.3) + ')');
-    c.fillStyle = g; c.fillRect(b.x, y - 90, b.w, 90);
+    g.addColorStop(1, 'rgba(249,219,8,' + (0.1 + k * 0.3) + ')');
+    c.fillStyle = g; c.fillRect(b.x + 6, y - 100, b.w - 12, 100);
 
-    c.fillStyle = '#171410';
-    this.rr(b.x, y - 13 - lift, b.w, 13 + lift, 5); c.fill();
-    this.glowLine(ACCENT, b.x, y - 13 - lift, b.w, 3, 18 + k * 24, 0.65 + k * 0.35);
+    c.fillStyle = '#16121B';
+    this.rr(b.x + 8, y - 7, b.w - 16, 7, 3); c.fill();
 
-    c.strokeStyle = 'rgba(249,219,8,' + (0.4 + 0.35 * Math.sin(this.t * 4)) + ')';
-    c.lineWidth = 2.4;
-    for (let i = 0; i < 2; i++) {
-      const ay = y - 28 - i * 15 - lift;
+    c.strokeStyle = 'rgba(232,224,216,0.55)'; c.lineWidth = 2; c.lineJoin = 'round';
+    c.beginPath();
+    const coilTop = plateY + 7; const coilBot = y - 7; const turns = 3;
+    for (let i = 0; i <= turns * 2; i++) {
+      const yy = coilBot + (coilTop - coilBot) * (i / (turns * 2));
+      const xx = cx + (i % 2 ? 14 : -14);
+      if (i === 0) c.moveTo(cx - 14, yy); else c.lineTo(xx, yy);
+    }
+    c.stroke();
+    c.lineJoin = 'miter';
+
+    c.save();
+    c.translate(0, plateY);
+    c.fillStyle = this.vGrad('padPlate', 7, [[0, '#4A3E2A'], [1, '#1E1914']]);
+    this.rr(b.x, 0, b.w, 7, 3.5); c.fill();
+    c.restore();
+    this.glowLine(ACCENT, b.x + 4, plateY, b.w - 8, 2.5, 18 + k * 26, 0.65 + k * 0.35);
+    if (k > 0) this.glow(ACCENT, cx, plateY, b.w * 0.8, k * 0.35, 40);
+
+    // Chevrons that rise and fade.
+    c.strokeStyle = ACCENT; c.lineWidth = 2.4; c.lineCap = 'round'; c.lineJoin = 'round';
+    for (let i = 0; i < 3; i++) {
+      const ph = (this.t * 0.8 + i / 3) % 1;
+      const ay = plateY - 12 - ph * 46;
+      c.globalAlpha = Math.sin(ph * Math.PI) * 0.75;
       c.beginPath();
-      c.moveTo(b.x + b.w / 2 - 13, ay);
-      c.lineTo(b.x + b.w / 2, ay - 11);
-      c.lineTo(b.x + b.w / 2 + 13, ay);
+      c.moveTo(cx - 12, ay); c.lineTo(cx, ay - 10); c.lineTo(cx + 12, ay);
       c.stroke();
     }
+    c.globalAlpha = 1;
+    c.lineCap = 'butt'; c.lineJoin = 'miter';
   }
 
   private drawMover(m: Mover) {
     const c = this.ctx;
     const x = this.moverX(m);
     const y = this.moverTop(m);
-    if (!this.onScreen(m.x0, m.x1 + m.w, y - 10, y + 20)) return;
-    c.strokeStyle = 'rgba(232,224,216,0.13)'; c.lineWidth = 1.5;
-    c.setLineDash([7, 9]);
-    c.beginPath();
-    c.moveTo(m.x0, y + 8); c.lineTo(m.x1 + m.w, y + 8);
-    c.stroke();
-    c.setLineDash([]);
+    if (!this.onScreen(m.x0, m.x1 + m.w, y - 20, y + 30)) return;
 
-    this.drawPlatform(x, y, m.w);
-    c.fillStyle = 'rgba(232,224,216,0.5)';
+    // The track: a dotted rail between two anchor studs.
+    const ty = y + 8; const a = m.x0 + 6; const z = m.x1 + m.w - 6;
+    c.fillStyle = 'rgba(232,224,216,0.16)';
+    for (let tx = a; tx <= z; tx += 14) c.fillRect(tx - 1, ty - 1, 2, 2);
+    for (const ex of [a, z]) {
+      this.glow(ACCENT, ex, ty, 10, 0.35);
+      c.fillStyle = 'rgba(249,219,8,0.7)';
+      c.beginPath(); c.arc(ex, ty, 2.5, 0, Math.PI * 2); c.fill();
+    }
+
+    this.drawPlatform(x, y, m.w, ACCENT);
+    c.fillStyle = 'rgba(249,219,8,0.55)';
     c.font = '600 9px "DM Mono", monospace';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
     c.fillText('⇄', x + m.w / 2, y + 13);
   }
 
 
+  /** A floating symbol inside a slowly turning ring, with two orbiting sparks. */
   private drawSigil(g: Sigil) {
     if (this.got[g.id]) return;
     const c = this.ctx;
     const y = floorY(g.f) - g.dy + Math.sin(this.t * 2.1 + g.x) * 5;
     if (!this.onScreen(g.x - 40, g.x + 40, y - 40, y + 40)) return;
     const pulse = 0.55 + 0.35 * Math.sin(this.t * 2.4 + g.x);
-    this.glow(ACCENT_DIM, g.x, y, 40, 0.3 * pulse);
+    this.glow(ACCENT, g.x, y, 44, 0.22 * pulse);
 
     c.save();
     c.translate(g.x, y);
-    c.rotate(Math.sin(this.t * 1.3 + g.x) * 0.18);
-    c.strokeStyle = 'rgba(232,224,216,0.4)'; c.lineWidth = 1.6;
-    this.rr(-15, -15, 30, 30, 8); c.stroke();
+    c.rotate(this.t * 0.5 + g.x);
+    c.strokeStyle = 'rgba(232,224,216,0.32)'; c.lineWidth = 1.3;
+    c.beginPath(); c.arc(0, 0, 16, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = 'rgba(249,219,8,0.55)'; c.lineWidth = 1.8;
+    c.beginPath(); c.arc(0, 0, 16, 0, Math.PI * 0.5); c.stroke();
+    c.beginPath(); c.arc(0, 0, 16, Math.PI, Math.PI * 1.5); c.stroke();
+    c.fillStyle = 'rgba(232,224,216,0.5)';
+    for (let i = 0; i < 4; i++) {
+      c.rotate(Math.PI / 2);
+      c.fillRect(-0.8, -21, 1.6, 4);
+    }
     c.restore();
 
-    this.glow(ACCENT, g.x, y, 16, 0.22 * pulse);
+    for (let i = 0; i < 2; i++) {
+      const an = this.t * 1.8 + g.x + i * Math.PI;
+      const ox = g.x + Math.cos(an) * 23; const oy = y + Math.sin(an) * 9;
+      this.glow(ACCENT, ox, oy, 7, 0.7);
+      c.fillStyle = '#FFF4B0';
+      c.fillRect(ox - 1, oy - 1, 2, 2);
+    }
+
+    this.glow(ACCENT, g.x, y, 14, 0.28 * pulse);
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.font = '600 20px "DM Mono", monospace';
-    c.fillStyle = '#D8C87A';
+    c.font = '600 19px "DM Mono", monospace';
+    c.fillStyle = '#F2E6A8';
     c.fillText(g.s, g.x, y + 1);
     c.textBaseline = 'alphabetic';
   }
@@ -1286,6 +1391,7 @@ export class WorldEngine {
     c.lineTo(left + w, gy);
   }
 
+  /** A stone gate: coursed pillars, an inner arch, a lit keystone gem. */
   private drawCave(n: Npc) {
     const c = this.ctx;
     const gy = floorY(n.f) - (n.dy ?? 0);
@@ -1298,29 +1404,37 @@ export class WorldEngine {
 
     this.glow(col, x, gy, 120, seen ? 0.22 : 0.1, 32);
 
-    this.caveArchPath(x, top, left, w, gy);
-    c.closePath();
-    c.fillStyle = '#141119';
-    c.fill();
-
     c.save();
-    this.caveArchPath(x, top, left, w, gy);
+    c.translate(0, top);
+    c.fillStyle = this.vGrad('arch', h, [[0, '#3A3145'], [1, '#17131D']]);
+    this.caveArchPath(x, 0, left, w, h);
     c.closePath();
-    c.clip();
-    this.drawHexField(left, top, w, h, 11, col, 0.16);
+    c.fill();
     c.restore();
+
+    // Block joints on each pillar, and the inner arch.
+    c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1.2;
+    c.beginPath();
+    for (const jy of [gy - 22, gy - 44]) {
+      c.moveTo(left + 1, jy); c.lineTo(left + 18, jy);
+      c.moveTo(left + w - 18, jy); c.lineTo(left + w - 1, jy);
+    }
+    c.stroke();
+    this.caveArchPath(x, top + 9, left + 9, w - 18, gy);
+    c.strokeStyle = 'rgba(232,224,216,0.12)'; c.lineWidth = 1.4;
+    c.stroke();
 
     this.caveArchPath(x, top, left, w, gy);
     c.strokeStyle = col;
     c.globalAlpha = 0.55;
-    c.lineWidth = 2.4;
+    c.lineWidth = 2.2;
     c.stroke();
     c.globalAlpha = 1;
 
     const mouthW = w * 0.52, mouthH = h * 0.72;
     const mg = c.createRadialGradient(x, gy - 2, 2, x, gy - 2, mouthW * 0.75);
     mg.addColorStop(0, seen ? 'rgba(249,219,8,0.4)' : 'rgba(232,224,216,0.22)');
-    mg.addColorStop(1, 'rgba(8,7,10,0.92)');
+    mg.addColorStop(1, 'rgba(8,7,10,0.95)');
     c.fillStyle = mg;
     c.beginPath();
     c.moveTo(x - mouthW / 2, gy);
@@ -1331,18 +1445,29 @@ export class WorldEngine {
     c.closePath();
     c.fill();
 
-    this.glow(ACCENT, x, top + 6, 18, 0.55 + 0.15 * Math.sin(this.t * 3 + x));
+    // Keystone with a gem.
+    c.fillStyle = '#463B52';
+    c.beginPath();
+    c.moveTo(x - 9, top - 1); c.lineTo(x + 9, top - 1);
+    c.lineTo(x + 6, top + 13); c.lineTo(x - 6, top + 13);
+    c.closePath(); c.fill();
+    const gem = 0.55 + 0.2 * Math.sin(this.t * 3 + x);
+    this.glow(ACCENT, x, top + 6, 20, gem);
+    c.save();
+    c.translate(x, top + 6);
+    c.rotate(Math.PI / 4);
     c.fillStyle = ACCENT;
-    c.beginPath(); c.arc(x, top + 6, 4.5, 0, Math.PI * 2); c.fill();
+    c.fillRect(-3.2, -3.2, 6.4, 6.4);
+    c.restore();
 
     c.font = '600 9px "DM Mono", monospace';
     c.fillStyle = seen ? col : 'rgba(232,224,216,0.45)';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
-    c.fillText(n.name.toUpperCase(), x, top - 12);
+    c.fillText(n.name.toUpperCase(), x, top - (seen ? 18 : 10));
     if (seen) {
       c.fillStyle = 'rgba(249,219,8,0.75)';
       c.font = '8px "DM Mono", monospace';
-      c.fillText('· found ·', x, top - 1);
+      c.fillText('· found ·', x, top - 7);
     }
   }
 
@@ -1372,26 +1497,66 @@ export class WorldEngine {
     c.save();
     c.translate(-this.camX, -this.camY);
 
-    const top = -230, bot = 40;
-    c.fillStyle = '#181119';
-    c.fillRect(-100, top, CORRIDOR_LEN + 200, bot - top);
-    this.drawHexField(-100, top, CORRIDOR_LEN + 200, bot - top, 13, INK, 0.07);
+    const top = -230;
+    const x0 = -100, span = CORRIDOR_LEN + 200;
 
-    this.glowLine(ACCENT, -100, -2.5, CORRIDOR_LEN + 200, 3, 18, 0.7);
+    // Back wall: warm stone, darker towards the ceiling.
+    c.save();
+    c.translate(0, top);
+    c.fillStyle = this.vGrad('corridor', -top, [[0, '#0E0B10'], [0.55, '#211A22'], [1, '#2A2128']]);
+    c.fillRect(x0, 0, span, -top);
+    c.restore();
+    c.fillStyle = this.stoneFill(30, 110, 0.04);
+    c.fillRect(x0, top, span, -top);
 
-    for (let tx = 70; tx < CORRIDOR_LEN; tx += 130) {
-      const flick = 0.6 + 0.4 * Math.sin(this.t * 6 + tx);
-      this.glow(ACCENT, tx, -150, 70 * (0.85 + flick * 0.15), 0.16 + flick * 0.06);
-      c.fillStyle = '#0C0A08';
-      this.rr(tx - 4, -168, 8, 42, 3); c.fill();
-      this.glow(ACCENT, tx, -172, 18 * flick, 0.75);
-      c.fillStyle = ACCENT;
-      c.beginPath(); c.arc(tx, -172, 5 * flick, 0, Math.PI * 2); c.fill();
+    // Pillars between the torches.
+    for (let px = 5; px <= CORRIDOR_LEN; px += 130) {
+      c.save();
+      c.translate(0, top);
+      c.fillStyle = this.vGrad('pillar', -top, [[0, '#120E14'], [1, '#2E252E']]);
+      c.fillRect(px - 11, 0, 22, -top);
+      c.restore();
+      c.fillStyle = 'rgba(232,224,216,0.06)';
+      c.fillRect(px - 11, top, 2, -top);
+      c.fillStyle = 'rgba(0,0,0,0.35)';
+      c.fillRect(px + 9, top, 2, -top);
     }
 
+    // Ceiling beam and floor slab.
+    c.fillStyle = '#0B090D';
+    c.fillRect(x0, top, span, 16);
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    c.fillRect(x0, top + 16, span, 6);
+    c.fillStyle = this.vGrad('corridorFloor', 320, [[0, '#2C2339'], [0.06, '#1A1424'], [0.5, '#0B0910'], [1, '#050404']]);
+    c.fillRect(x0, 0, span, 320);
+    c.fillStyle = 'rgba(232,224,216,0.07)';
+    c.fillRect(x0, 0, span, 7);
+
+    this.glowLine(ACCENT, x0, -2.5, span, 2.5, 18, 0.7);
+
+    // Torches: an iron bracket and a flickering flame.
+    for (let tx = 70; tx < CORRIDOR_LEN; tx += 130) {
+      const flick = 0.75 + 0.25 * Math.sin(this.t * 9 + tx) * Math.sin(this.t * 5.3 + tx * 0.7);
+      this.glow(ACCENT, tx, -150, 95 * flick, 0.2);
+      this.glow('#FF8A1F', tx, -168, 34 * flick, 0.35);
+      c.fillStyle = '#0C0A08';
+      this.rr(tx - 3, -160, 6, 30, 2); c.fill();
+      this.rr(tx - 8, -164, 16, 5, 2); c.fill();
+      c.fillStyle = '#FFB547';
+      c.beginPath();
+      c.moveTo(tx - 5, -165);
+      c.quadraticCurveTo(tx - 6, -174, tx + Math.sin(this.t * 7 + tx) * 1.5, -165 - 15 * flick);
+      c.quadraticCurveTo(tx + 6, -174, tx + 5, -165);
+      c.closePath(); c.fill();
+      c.fillStyle = '#FFF4B0';
+      c.beginPath(); c.ellipse(tx, -168, 2, 4 * flick, 0, 0, Math.PI * 2); c.fill();
+    }
+
+    // Exits: lit doorframes.
     for (const ex of [0, CORRIDOR_LEN]) {
-      c.strokeStyle = 'rgba(249,219,8,0.35)'; c.lineWidth = 3;
-      c.beginPath(); c.moveTo(ex, -2); c.lineTo(ex, top + 30); c.stroke();
+      this.glow(ACCENT, ex, -60, 40, 0.12, 120);
+      c.fillStyle = 'rgba(249,219,8,0.45)';
+      c.fillRect(ex - 1.5, top + 22, 3, -top - 24);
     }
 
     if (n) {
@@ -1433,19 +1598,6 @@ export class WorldEngine {
 
     c.save();
     c.translate(-this.camX, -this.camY);
-
-    c.strokeStyle = 'rgba(232,224,216,0.05)'; c.lineWidth = 1;
-    c.beginPath();
-    const gx0 = Math.floor((this.camX - 120) / 110) * 110;
-    for (let v = gx0; v < this.camX + this.VW + 110; v += 110) {
-      c.moveTo(v, floorY(2) - 260); c.lineTo(v, floorY(0) + 150);
-    }
-    for (let f = 0; f < 3; f++) {
-      for (let hy = floorY(f); hy > floorY(f) - 300; hy -= 110) {
-        c.moveTo(this.camX - 40, hy); c.lineTo(this.camX + this.VW + 40, hy);
-      }
-    }
-    c.stroke();
 
     for (let f2 = 2; f2 >= 0; f2--) this.drawFloorSlab(f2);
     LIFTS.forEach((L) => this.drawLift(L));
