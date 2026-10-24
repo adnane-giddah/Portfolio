@@ -101,6 +101,12 @@ for (const id of ['hero', 'showcase', 'about', 'education', 'achievements', 'coa
 ok($$('nav .nav-links a').length === 6, `nav has ${$$('nav .nav-links a').length} links (5 + CV)`);
 ok($$('.medal-card').length === 12, `all 12 medals rendered`);
 ok($$('.project-card').length === 4, `all 4 projects rendered`);
+const adnCard = $$('.project-card').find((card) => card.querySelector('.project-title')?.textContent === 'ADN');
+const visitLink = adnCard?.querySelector('.project-visit-link');
+ok(!!visitLink, 'the ADN project has a website button');
+ok(visitLink?.getAttribute('href') === 'https://main-roan-beta.vercel.app/', 'the ADN website button points to the requested site');
+ok(visitLink?.getAttribute('target') === '_blank', 'the ADN website opens in a new tab');
+ok($$('.project-visit-link').length === 1, 'only the ADN project shows the website button');
 ok($$('.contact-link').length === 5, `all 5 contact links rendered`);
 ok($$('.stat-card').length === 4, `all 4 stat cards rendered`);
 

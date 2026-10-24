@@ -129,6 +129,16 @@ export function ProjectsBody() {
             </div>
             <div className="project-title">{p.title}</div>
             <p className="project-desc">{p.desc}</p>
+            {p.title === 'ADN' && (
+              <a
+                className="project-visit-link"
+                href={p.href}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                Visit website ↗
+              </a>
+            )}
           </div>
         </div>
       ))}

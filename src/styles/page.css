@@ -471,6 +471,21 @@ section { padding: 100px 48px; border-top: 1px solid var(--border); }
   letter-spacing: 0.04em;
 }
 .project-years { font-size: 10px; color: var(--orange); letter-spacing: 0.15em; margin-bottom: 14px; }
+.project-visit-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 16px;
+  padding: 7px 12px;
+  background: var(--orange);
+  color: var(--on-orange);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  transition: filter 0.2s;
+}
+.project-visit-link:hover { filter: brightness(1.12); }
+.project-visit-link:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 
 .project-media {
   position: relative;
