@@ -5,7 +5,7 @@ export const PROFILE = {
   tag: 'AI Engineering Student · Mathematician · Olympiad Coach',
   subtitle: 'Where rigour meets intelligence.',
   bio: "Undergraduate at ENSIA, Algeria's national school of Artificial Intelligence. IMC medalist, PAMO gold laureate, and coach to 500+ students across Africa. Driven by the mathematical foundations of learning algorithms.",
-  cvHref: 'cv.pdf',
+  cvHref: 'Adnane_CV.pdf',
 
   photo: 'photo.jpg',
   photoAlt: 'Ahmed Adnane Meddah',
@@ -111,7 +111,7 @@ export const MEDALS: Medal[] = [
     badge: 'Gold Medal',
     competition: 'Pan-African Mathematical Olympiad',
     details: 'PAMO 2024 · South Africa',
-    href: 'https://www.pamoofficial.org/timeline/2024/individual.html',
+    href: 'https://www.pamoofficial.org/timeline/2024/',
   },
   {
     kind: 'gold',
@@ -245,6 +245,13 @@ export const PROJECTS: Project[] = [
     role: 'Administrator & Developer',
     href: '#',
     desc: "Administered and developed the Discord infrastructure of the Algerian Mathematical Olympiad Organization. Built bots to automate thread creation, role assignment, and channel-tailored introduction messages.",
+  },
+  {
+    years: '2026',
+    title: 'Algiers in 24h',
+    role: 'Team Project · ENSIA',
+    href: 'https://github.com/SpeedCode210/Algiers-In-24h',
+    desc: 'Tour-planning system for tourists in Algiers, built by a team of six for the Introduction to AI course. Compares greedy, GRASP, simulated annealing, tabu search, genetic algorithms and an exact CPLEX model on Solomon benchmarks.',
   },
   {
     years: '2026 — Present',
