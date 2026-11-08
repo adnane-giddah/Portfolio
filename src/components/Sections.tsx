@@ -14,7 +14,7 @@ export function AboutBody() {
         <p className="about-text">
           I am an undergraduate specializing in <em>artificial intelligence</em> with a strong
           foundation in mathematics. My focus lies at the intersection of{' '}
-          <em>optimization theory</em> and machine learning — building and analyzing the algorithms
+          <em>optimization theory</em> and machine learning, building and analyzing the algorithms
           that shape the future of intelligence.
           <br />
           <br />
@@ -193,8 +193,8 @@ export function ContactBody() {
           Together.
         </h3>
         <p className="contact-sub">
-          Whether it&apos;s research collaboration, coaching opportunities, or academic partnerships
-          — I&apos;m always open to meaningful conversations. Based in Blida, Algeria.
+          Research collaboration, coaching, academic partnerships:
+          if it&apos;s interesting, write to me. Based in Blida, Algeria.
         </p>
       </div>
       <div className="contact-links">
@@ -225,13 +225,13 @@ export function CvVaultBody({ href }: { href: string }) {
         <div className="vault-kicker">The Archive · kept by the Archivist</div>
         <h2 className="vault-h">The Curriculum Vitae</h2>
         <p className="vault-p">
-          Everything on this site, folded into two pages: the degrees, the medals, the coaching
+          Everything on this site, in one PDF: the degrees, the medals, the coaching
           record and the work. Take a copy with you.
         </p>
         <a className="vault-cta" href={href} download>
           ◈ Download the CV
         </a>
-        <div className="vault-note">PDF · placeholder file for now</div>
+        <div className="vault-note">PDF · last updated October 2026</div>
       </div>
     </div>
   );

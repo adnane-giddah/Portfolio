@@ -1,4 +1,4 @@
-# Ahmed Adnane Meddah — Portfolio
+# Ahmed Adnane Meddah's Portfolio
 
 Personal portfolio built with **React + TypeScript** and **Vite**.
 

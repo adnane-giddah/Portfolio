@@ -19,10 +19,10 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
             id="projectShot"
             className="shot-img"
             src="world-preview.jpg"
-            alt="The three-floor game map — Floor 1, Ground"
+            alt="The three-floor game map, Floor 1 (Ground)"
           />
           <figcaption className="shot-cap">
-            <b>Floor 1 — Ground</b>
+            <b>Floor 1 · Ground</b>
             <span>a live screenshot of the map below</span>
           </figcaption>
         </figure>
@@ -34,7 +34,7 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
             three&#8209;floor map.
           </h3>
           <p>
-            Walk it as a small explorer. Every floor holds caves that lead into a short dungeon —
+            Walk it as a small explorer. Every floor holds caves that lead into a short dungeon:
             find the jewel inside to open that part of the story, then keep walking to come out the
             other side. Along the way, collect the pieces of <em>Euler&apos;s identity</em>, e^iπ+1=0.
           </p>
@@ -62,7 +62,7 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
                 '✓ Everything is unlocked'
               ) : (
                 <>
-                  <span className="sb-x">⤼</span> Skip the game — show me everything
+                  <span className="sb-x">⤼</span> Skip the game, show me everything
                 </>
               )}
             </button>
@@ -71,13 +71,13 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
           <p className={'skip-note' + (allUnlocked ? ' skip-done' : '')}>
             {allUnlocked ? (
               <>
-                <b>Everything is already unlocked.</b> Scroll on — every section is open. The game
+                <b>Everything is already unlocked.</b> Scroll on, every section is open. The game
                 is still there if you want it.
               </>
             ) : (
               <>
                 <b>The game is optional.</b> Every section of this portfolio can be read normally by
-                scrolling. Press <b>Skip</b> and all four locked sections open at once — no walking,
+                scrolling. Press <b>Skip</b> and all four locked sections open at once. No walking,
                 no jumping, nothing to find.
               </>
             )}

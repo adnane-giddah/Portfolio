@@ -61,7 +61,7 @@ export function Hero({ onPlay, onSkip, allUnlocked }: Props) {
             id="heroSkip"
             onClick={onSkip}
           >
-            {allUnlocked ? '✓ Unlocked' : '⤼ Skip the game — show everything'}
+            {allUnlocked ? '✓ Unlocked' : '⤼ Skip the game, show everything'}
           </button>
         </div>
       </div>

@@ -969,7 +969,7 @@ export class WorldEngine {
     if (!sp) {
       const [cv, x] = makeCanvas(96, 96);
       x.fillStyle = ACCENT_DIM;
-      x.font = 'italic 64px "Instrument Serif", Georgia, serif';
+      x.font = 'italic 64px "Newsreader", Georgia, serif';
       x.textAlign = 'center'; x.textBaseline = 'middle';
       x.fillText(s, 48, 48);
       sp = cv;
@@ -1147,7 +1147,7 @@ export class WorldEngine {
     c.fillStyle = 'rgba(249,219,8,0.5)';
     c.font = '600 11px "DM Mono", monospace';
     c.textAlign = 'left'; c.textBaseline = 'alphabetic';
-    c.fillText('FLOOR ' + (f + 1) + ' — ' + F.name, F.x0 + 74, gy + 36);
+    c.fillText('FLOOR ' + (f + 1) + ' · ' + F.name, F.x0 + 74, gy + 36);
     c.fillStyle = 'rgba(232,224,216,0.25)';
     c.font = '9px "DM Mono", monospace';
     c.fillText(F.sub.toUpperCase(), F.x0 + 74, gy + 52);

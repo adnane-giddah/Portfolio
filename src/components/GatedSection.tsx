@@ -31,7 +31,7 @@ export function GatedSection({ id, unlocked, children, onFind, onSkip }: Props) 
             </button>
             <span className="gc-or">or, if you would rather not play</span>
             <button className="gc-skip" type="button" onClick={() => onSkip(id)}>
-              ⤼ Skip — unlock every section now
+              ⤼ Skip and unlock every section
             </button>
           </div>
         )}

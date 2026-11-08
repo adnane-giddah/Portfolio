@@ -70,7 +70,7 @@ export const SIGILS: Sigil[] = [
 export const NPCS: Npc[] = [
   {
     id: 'about', f: 0, x: 380, cls: 'conqueror', glyph: 'λ', name: 'The Cartographer', title: 'About',
-    line: 'Every map needs an origin. Mine starts at ENSIA — optimization, learning algorithms, and the mathematics underneath. Want the long version?',
+    line: 'Every map needs an origin. Mine starts at ENSIA: optimization, learning algorithms, and the mathematics underneath. Want the long version?',
   },
   {
 
@@ -79,12 +79,12 @@ export const NPCS: Npc[] = [
   },
   {
     id: 'cv', f: 0, x: 2470, cls: 'sorcerer', glyph: '∞', name: 'The Archivist', title: 'The CV',
-    line: 'I keep one document down here — everything above, folded into two pages. It is yours to take.',
+    line: 'I keep one document down here. Everything above, in one PDF. It is yours to take.',
   },
   {
 
     id: 'achievements', f: 1, x: 2480, dy: 200, cls: 'public', glyph: 'Σ', name: 'The Medalist', title: 'Olympiad Awards',
-    line: 'Eleven of them. IMO, IMC, PAMO, the Francophone. Bronze, silver, gold — and two that missed by a hair. Care to look?',
+    line: 'Eleven of them. IMO, IMC, PAMO, the Francophone. Bronze, silver, gold, and two that missed by a hair. Care to look?',
   },
   {
     id: 'coaching', f: 1, x: 980, cls: 'leader', glyph: '∇', name: 'The Coach', title: 'Coaching & Leadership',
@@ -101,7 +101,7 @@ export const NPCS: Npc[] = [
   },
   {
     id: 'contact', f: 2, x: 2540, cls: 'religious', glyph: 'φ', name: 'The Messenger', title: 'Contact',
-    line: 'The way out is also a way in. Mail, phone, GitHub, LinkedIn — every line here reaches a real person. Shall I open the channels?',
+    line: 'The way out is also a way in. Mail, phone, GitHub, LinkedIn. Every line here reaches a real person. Shall I open the channels?',
   },
 ];
 
@@ -109,19 +109,19 @@ export const NPCS: Npc[] = [
 export const GATED: Record<GatedId, GateInfo> = {
   achievements: {
     num: '03', title: 'Olympiad Awards', who: 'the Medalist', where: 'the Mezzanine',
-    desc: 'Eleven medals from IMO, IMC, PAMO and beyond — kept by the Medalist, one floor up.',
+    desc: 'Eleven medals from IMO, IMC, PAMO and beyond, kept by the Medalist, one floor up.',
   },
   coaching: {
     num: '04', title: 'Coaching & Leadership', who: 'the Coach', where: 'the Mezzanine',
-    desc: 'Coaching, delegations and olympiad leadership — the Coach keeps this ledger.',
+    desc: 'Coaching, delegations and olympiad leadership. The Coach keeps this ledger.',
   },
   projects: {
     num: '05', title: 'Projects', who: 'the Builder', where: 'the Observatory',
-    desc: 'Communities of 1,000+ students and the work behind them — ask the Builder on the top floor.',
+    desc: 'Communities of 1,000+ students and the work behind them. Ask the Builder on the top floor.',
   },
   skills: {
     num: '06', title: 'Technical Skills', who: 'the Smith', where: 'the Observatory',
-    desc: 'The stack and the languages — laid out on the Smith’s workbench.',
+    desc: 'The stack and the languages, laid out on the Smith’s workbench.',
   },
 };
 

@@ -45,7 +45,7 @@ export default function App() {
   const skipEverything = useCallback((scrollTo?: string) => {
     revealAll();
     setWorldOpen(false);
-    toast('Everything unlocked — scroll freely');
+    toast('Everything unlocked, scroll freely');
     if (scrollTo) {
       window.setTimeout(() => {
         document.getElementById(scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });

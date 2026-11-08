@@ -56,7 +56,7 @@ export function TouchPad({ engine, promptReady }: Props) {
           className={'pad-b pad-talk' + (promptReady ? ' ready' : '')}
           id="padE"
           type="button"
-          aria-label="Use — ride the lift or open a jewel"
+          aria-label="Use: ride the lift or open a jewel"
           onPointerDown={(e) => { e.preventDefault(); engine.current?.act(); }}
         >
           <span className="pb-ar">◉</span> Use

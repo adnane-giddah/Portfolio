@@ -32,7 +32,7 @@ export function ProjectMedia({ images, alt }: Props) {
       onTouchEnd={onTouchEnd}
       onClick={(e) => e.preventDefault()}
     >
-      <img src={images[index]} alt={`${alt} — screenshot ${index + 1}`} loading="lazy" />
+      <img src={images[index]} alt={`${alt}, screenshot ${index + 1}`} loading="lazy" />
 
       {images.length > 1 && (
         <>

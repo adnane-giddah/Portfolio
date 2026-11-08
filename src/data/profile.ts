@@ -3,7 +3,7 @@
 export const PROFILE = {
   name: { first: 'Ahmed', middle: 'Adnane', last: 'Meddah' },
   tag: 'AI Engineering Student · Mathematician · Olympiad Coach',
-  subtitle: 'Where rigour meets intelligence.',
+  subtitle: 'Maths first, then the machines.',
   bio: "Undergraduate at ENSIA, Algeria's national school of Artificial Intelligence. IMC medalist, PAMO gold laureate, and coach to 500+ students across Africa. Driven by the mathematical foundations of learning algorithms.",
   cvHref: 'Adnane_CV.pdf',
 
@@ -46,18 +46,18 @@ export interface EduItem {
 
 export const EDUCATION: EduItem[] = [
   {
-    years: '2024 — PRESENT',
+    years: '2024 – PRESENT',
     place: 'Algiers, Algeria',
     school: "École Nationale Supérieure d'Intelligence Artificielle",
     degree: 'Engineering Degree in Artificial Intelligence · ENSIA',
-    detail: 'Ranked in category A — top 10% (first 27) based on annual average.',
+    detail: 'Ranked in category A (top 10%, first 27) on the annual average.',
   },
   {
-    years: '2021 — 2024',
+    years: '2021 – 2024',
     place: 'Algeria',
-    school: 'High School — Mathematics Stream',
+    school: 'High School, Mathematics Stream',
     degree: 'Baccalauréat · Mention Mathematics',
-    detail: 'Obtained with "Excellent" honours — average 18+/20.',
+    detail: 'Mention "Excellent", average above 18/20.',
   },
 ];
 
@@ -157,7 +157,7 @@ export const COACHING: CoachingItem[] = [
   {
     org: 'AMO',
     role: 'President',
-    period: 'Aug 2026 — Present · Algeria',
+    period: 'Aug 2026 – Present · Algeria',
     points: [
       'Overall direction and supervision of the entire AMO organizing team.',
       'Strategic coordination of academic, logistical, and operational activities on a national scale.',
@@ -167,7 +167,7 @@ export const COACHING: CoachingItem[] = [
   {
     org: 'AMO',
     role: 'Coach & Leader',
-    period: '2024 — Present · Algeria',
+    period: '2024 – Present · Algeria',
     points: [
       'Coached 50+ high school students for national and international mathematics competitions.',
       'Directed the academic and logistical organization of the 2025 ALMO Finals (200+ participants), contributing to the Problem Selection Committee & Correction/Inspection.',
@@ -182,7 +182,7 @@ export const COACHING: CoachingItem[] = [
   {
     org: 'AOI',
     role: 'Coach',
-    period: '2024 — 2025 · Algeria',
+    period: '2024 – 2025 · Algeria',
     points: [
       'Mentored and coached 50+ students in algorithms, data structures, and problem-solving techniques.',
       'Coordinated onsite selection tests and training camps, including problem setting.',
@@ -191,7 +191,7 @@ export const COACHING: CoachingItem[] = [
   {
     org: 'AOA',
     role: 'Lecturer',
-    period: '2025 — Present · Remote (Rwanda)',
+    period: '2025 – Present · Remote (Rwanda)',
     points: [
       'Delivered online lectures in mathematics and informatics to students from 10+ African countries as part of the Rising Stars Program.',
     ],
@@ -209,28 +209,28 @@ export interface Project {
 
 export const PROJECTS: Project[] = [
   {
-    years: '2024 — 2026',
+    years: '2024 – 2026',
     title: 'BAC World',
     href: '#',
     desc: 'Founded and scaled a high-performance academic community reaching 1,000+ students preparing for the Algerian Baccalaureate. Led a team of student-teachers and contributors. Members achieved scores above 18/20, including top national performers.',
   },
   {
-    years: '2024 — 2026',
+    years: '2024 – 2026',
     title: 'Academic Horizon Hub',
     href: '#',
     desc: 'Co-managed a 1,000+ member platform delivering academic opportunities and guidance. Collaborated with BAC World to expand outreach and impact across Algeria.',
   },
   {
-    years: '2025 — 2026',
+    years: '2025 – 2026',
     title: 'MathWin Program',
     href: '#',
     desc: 'Participated in the MathWin educational program as a student, learning and applying advanced mathematical concepts throughout the 2025–2026 academic year.',
   },
   {
     years: 'March 2026',
-    title: 'MathCamp — 6th Edition',
+    title: 'MathCamp, 6th Edition',
     href: '#',
-    desc: 'Attended MathCamp — 6th Edition as a student, engaging with advanced conferences and workshops covering various areas of mathematics designed for undergraduate students.',
+    desc: 'Took part in the 6th edition of MathCamp as a student: lectures and workshops for undergraduates on PDEs, dynamical systems, Fourier analysis, topology and more.',
   },
   {
     years: '2026',
@@ -254,11 +254,11 @@ export const PROJECTS: Project[] = [
     desc: 'Tour-planning system for tourists in Algiers, built by a team of six for the Introduction to AI course. Compares greedy, GRASP, simulated annealing, tabu search, genetic algorithms and an exact CPLEX model on Solomon benchmarks.',
   },
   {
-    years: '2026 — Present',
+    years: '2026 – Present',
     title: 'Configuration Spaces in Normed Spaces',
     role: 'Geometry Research',
     href: '#',
-    desc: 'Research under the supervision of Ghani Zeghib (CNRS Research Director, ENS Lyon), with Mohamed Amir BenMelouka and Haithem Idris Ait Hamadouche — studying geometric and topological structures of configuration spaces in normed spaces.',
+    desc: 'Research under the supervision of Ghani Zeghib (CNRS Research Director, ENS Lyon), with Mohamed Amir BenMelouka and Haithem Idris Ait Hamadouche, on geometric and topological structures of configuration spaces in normed spaces.',
   },
 ];
 

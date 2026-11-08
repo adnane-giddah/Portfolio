@@ -63,8 +63,8 @@ export function World({
         cbs.current.onGot(sigil.id);
         cbs.current.onToast(
           collected >= total
-            ? 'e^iπ+1=0 — the identity is complete'
-            : `"${sigil.s}" found — ${collected}/${total}`,
+            ? 'e^iπ+1=0, the identity is complete'
+            : `"${sigil.s}" found, ${collected}/${total}`,
         );
       },
     });
@@ -201,7 +201,7 @@ export function World({
       className={(open ? 'on playing' : '')}
       role="dialog"
       aria-modal="true"
-      aria-label="The world — a three-floor map"
+      aria-label="The world, a three-floor map"
       aria-hidden={!open}
     >
       <canvas id="gcv" ref={canvasRef} />
@@ -270,7 +270,7 @@ export function World({
         <kbd>←</kbd>
         <kbd>→</kbd> walk · <kbd>Space</kbd> jump · <kbd>E</kbd> ride the lifts &amp; open jewels
         <br />
-        walk into a cave (or jump it) — find the jewel inside, then keep going to come out the other side
+        walk into a cave (or jump it), find the jewel inside, then keep going to come out the other side
       </div>
 
       <TouchPad engine={engineRef} promptReady={!!prompt} />
