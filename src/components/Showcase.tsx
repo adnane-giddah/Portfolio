@@ -1,5 +1,6 @@
 import { useReveal } from '../hooks/useReveal';
 import { SectionHeader } from './SectionHeader';
+import { WorldMap } from './WorldMap';
 
 interface Props {
   onPlay: () => void;
@@ -15,56 +16,29 @@ export function Showcase({ onPlay, onSkip, allUnlocked }: Props) {
       <SectionHeader num="00" title="The World" />
       <div className="showcase-wrap reveal" ref={ref}>
         <figure className="shot-frame">
-          <img
-            id="projectShot"
-            className="shot-img"
-            src="world-preview.jpg"
-            alt="The three-floor game map, Floor 1 (Ground)"
-          />
+          <WorldMap onPlay={onPlay} />
           <figcaption className="shot-cap">
-            <b>Floor 1 · Ground</b>
-            <span>a live screenshot of the map below</span>
+            The actual floor plan, drawn from the level data. Click it to walk in.
           </figcaption>
         </figure>
 
         <div className="showcase-side">
           <h3>
-            This portfolio is a
+            The site is also a
             <br />
-            three&#8209;floor map.
+            three&#8209;floor game.
           </h3>
           <p>
             Walk it as a small explorer. Every floor holds caves that lead into a short dungeon:
             find the jewel inside to open that part of the story, then keep walking to come out the
             other side. Along the way, collect the pieces of <em>Euler&apos;s identity</em>, e^iπ+1=0.
           </p>
-          <div className="floor-list">
-            <div className="floor-row">
-              <i />
-              <span>Floor 3</span> Observatory · projects, skills, contact
-            </div>
-            <div className="floor-row">
-              <i />
-              <span>Floor 2</span> Mezzanine · awards, coaching
-            </div>
-            <div className="floor-row">
-              <i />
-              <span>Floor 1</span> Ground · about, education, the archive
-            </div>
-          </div>
-
           <div className="world-cta">
             <button id="enterWorld" type="button" onClick={onPlay}>
-              <span className="ew-e">e</span> Play / Explore
+              Walk the map
             </button>
             <button id="skipWorld" className="skip-btn" type="button" onClick={onSkip}>
-              {allUnlocked ? (
-                '✓ Everything is unlocked'
-              ) : (
-                <>
-                  <span className="sb-x">⤼</span> Skip the game, show me everything
-                </>
-              )}
+              {allUnlocked ? 'Everything is unlocked' : 'Skip the game'}
             </button>
           </div>
 

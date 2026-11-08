@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import './styles/page.css';
 import './styles/world.css';
+import './styles/shapes.css';
 
 import { PROFILE } from './data/profile';
 import type { GatedId, SectionId } from './types';

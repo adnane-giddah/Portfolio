@@ -99,8 +99,8 @@ for (const id of ['hero', 'showcase', 'about', 'education', 'achievements', 'coa
   ok(!!$('#' + id), `section #${id} is on the page`);
 }
 ok($$('nav .nav-links a').length === 6, `nav has ${$$('nav .nav-links a').length} links (5 + CV)`);
-ok($$('.medal-card').length === 12, `all 12 medals rendered`);
-ok($$('.project-card').length === 4, `all 4 projects rendered`);
+ok($$('.medal-card').length === 11, `all 11 medals rendered`);
+ok($$('.project-card').length === 8, `all 8 projects rendered`);
 const adnCard = $$('.project-card').find((card) => card.querySelector('.project-title')?.textContent === 'ADN');
 const visitLink = adnCard?.querySelector('.project-visit-link');
 ok(!!visitLink, 'the ADN project has a website button');
@@ -112,24 +112,23 @@ ok($$('.stat-card').length === 4, `all 4 stat cards rendered`);
 
 const photo = $('.hero-photo');
 ok(!!photo, 'the hero has a portrait slot');
-ok(photo.parentElement.classList.contains('hero-right'), 'it sits in the hero, above the stats');
-ok(photo.previousElementSibling === null, 'it is the first thing in that column');
+ok(photo.parentElement.classList.contains('honeycomb'), 'it sits in the honeycomb with the stats');
+ok(photo.previousElementSibling === null, 'it is the first cell of the honeycomb');
 const img = $('.hero-photo img');
 ok(!!img, 'it renders an <img> pointing at the photo');
 ok(img.getAttribute('src') === 'photo.jpg', `src is "${img.getAttribute('src')}"`);
 ok(!!img.getAttribute('alt'), 'the image has alt text');
-ok(!$('.hero-photo figcaption'), 'no card chrome — the circle is the whole thing');
+ok(!$('.hero-photo figcaption'), 'no card chrome, the hexagon is the whole thing');
 await act(async () => { img.dispatchEvent(new window.Event('error')); });
-ok(!!$('.hp-empty'), 'a missing photo falls back to the same circle with the mark');
+ok(!!$('.hp-empty'), 'a missing photo falls back to the same hexagon with the mark');
 ok(/photo\.jpg/.test($('.hp-hint').textContent), 'the placeholder names the file to drop in');
 
 const photoCss = readFileSync(join(root, 'src/styles/page.css'), 'utf8');
 const block = photoCss.slice(photoCss.indexOf('.hero-photo {'));
-ok(/border-radius:\s*50%/.test(block), 'the portrait is a circle');
-ok(/border:\s*2px solid var\(--orange\)/.test(block), 'it has an orange rim');
-ok(/\.hp-img,\s*\n\.hp-empty\s*\{[^}]*border-radius:\s*50%/.test(block),
-   'the photo and the placeholder are both clipped to the circle');
-ok(/aspect-ratio:\s*1/.test(block), 'it stays perfectly round at any width');
+ok(/clip-path:\s*var\(--hex\)/.test(photoCss), 'the portrait is a hexagon');
+ok(/background:\s*var\(--orange\)/.test(block), 'it has an orange rim');
+ok(/\.hp-img,\s*\n\.hp-empty\s*\{[^}]*clip-path:\s*var\(--hex\)/.test(block),
+   'the photo and the placeholder are both clipped to the hexagon');
 
 const ring = $('#cursor');
 ok(!!ring, 'the orange accent ring renders on a fine-pointer device');

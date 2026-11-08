@@ -186,11 +186,11 @@ export function ContactBody() {
     <div className="contact-inner reveal" ref={ref}>
       <div>
         <h3 className="contact-headline">
-          Let&apos;s
+          Got a
           <br />
-          <span>Work</span>
+          <span>problem</span>
           <br />
-          Together.
+          worth solving?
         </h3>
         <p className="contact-sub">
           Research collaboration, coaching, academic partnerships:
@@ -222,14 +222,13 @@ export function CvVaultBody({ href }: { href: string }) {
     <div id="cvVault" className="in-panel">
       <div className="vault-inner">
         <div className="vault-e">e</div>
-        <div className="vault-kicker">The Archive · kept by the Archivist</div>
         <h2 className="vault-h">The Curriculum Vitae</h2>
         <p className="vault-p">
           Everything on this site, in one PDF: the degrees, the medals, the coaching
           record and the work. Take a copy with you.
         </p>
         <a className="vault-cta" href={href} download>
-          ◈ Download the CV
+          Download the CV
         </a>
         <div className="vault-note">PDF · last updated October 2026</div>
       </div>

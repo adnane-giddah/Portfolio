@@ -23,15 +23,15 @@ export function GatedSection({ id, unlocked, children, onFind, onSkip }: Props) 
         {!unlocked && (
           <div className="gate-card">
             <div className="gc-glyph">e</div>
-            <div className="gc-lock">Locked · {g.where}</div>
+            <div className="gc-lock">Locked, on {g.where}</div>
             <div className="gc-title">{g.title}</div>
             <p className="gc-desc">{g.desc}</p>
             <button className="gc-btn" type="button" onClick={() => onFind(id)}>
-              ▶ Find {g.who}
+              Find {g.who}
             </button>
             <span className="gc-or">or, if you would rather not play</span>
             <button className="gc-skip" type="button" onClick={() => onSkip(id)}>
-              ⤼ Skip and unlock every section
+              Skip and unlock everything
             </button>
           </div>
         )}

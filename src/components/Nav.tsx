@@ -73,7 +73,7 @@ export function Nav({ onToggleTheme, forceClose }: Props) {
           </a>
         ))}
         <a href={PROFILE.cvHref} className="nav-cv" download onClick={() => setOpen(false)}>
-          CV ◈
+          CV
         </a>
         <button className="theme-toggle" type="button" onClick={onToggleTheme}>
           ☀ / ☾

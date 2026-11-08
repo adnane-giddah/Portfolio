@@ -969,7 +969,7 @@ export class WorldEngine {
     if (!sp) {
       const [cv, x] = makeCanvas(96, 96);
       x.fillStyle = ACCENT_DIM;
-      x.font = 'italic 64px "Newsreader", Georgia, serif';
+      x.font = 'italic 64px "Fraunces", Georgia, serif';
       x.textAlign = 'center'; x.textBaseline = 'middle';
       x.fillText(s, 48, 48);
       sp = cv;
@@ -1145,11 +1145,11 @@ export class WorldEngine {
     this.glowLine(ACCENT, x0, gy - 2.5, w, 2.5, 20, 0.7);
 
     c.fillStyle = 'rgba(249,219,8,0.5)';
-    c.font = '600 11px "DM Mono", monospace';
+    c.font = '600 11px "Space Mono", monospace';
     c.textAlign = 'left'; c.textBaseline = 'alphabetic';
     c.fillText('FLOOR ' + (f + 1) + ' · ' + F.name, F.x0 + 74, gy + 36);
     c.fillStyle = 'rgba(232,224,216,0.25)';
-    c.font = '9px "DM Mono", monospace';
+    c.font = '9px "Space Mono", monospace';
     c.fillText(F.sub.toUpperCase(), F.x0 + 74, gy + 52);
   }
 
@@ -1212,7 +1212,7 @@ export class WorldEngine {
     }
 
     c.fillStyle = 'rgba(232,224,216,0.7)';
-    c.font = '600 10px "DM Mono", monospace';
+    c.font = '600 10px "Space Mono", monospace';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
     c.fillText('LIFT', L.x, top - 202);
   }
@@ -1334,7 +1334,7 @@ export class WorldEngine {
 
     this.drawPlatform(x, y, m.w, ACCENT);
     c.fillStyle = 'rgba(249,219,8,0.55)';
-    c.font = '600 9px "DM Mono", monospace';
+    c.font = '600 9px "Space Mono", monospace';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
     c.fillText('⇄', x + m.w / 2, y + 13);
   }
@@ -1374,7 +1374,7 @@ export class WorldEngine {
 
     this.glow(ACCENT, g.x, y, 14, 0.28 * pulse);
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.font = '600 19px "DM Mono", monospace';
+    c.font = '600 19px "Space Mono", monospace';
     c.fillStyle = '#F2E6A8';
     c.fillText(g.s, g.x, y + 1);
     c.textBaseline = 'alphabetic';
@@ -1460,13 +1460,13 @@ export class WorldEngine {
     c.fillRect(-3.2, -3.2, 6.4, 6.4);
     c.restore();
 
-    c.font = '600 9px "DM Mono", monospace';
+    c.font = '600 9px "Space Mono", monospace';
     c.fillStyle = seen ? col : 'rgba(232,224,216,0.45)';
     c.textAlign = 'center'; c.textBaseline = 'alphabetic';
     c.fillText(n.name.toUpperCase(), x, top - (seen ? 18 : 10));
     if (seen) {
       c.fillStyle = 'rgba(249,219,8,0.75)';
-      c.font = '8px "DM Mono", monospace';
+      c.font = '8px "Space Mono", monospace';
       c.fillText('· found ·', x, top - 7);
     }
   }
@@ -1576,12 +1576,12 @@ export class WorldEngine {
       c.restore();
 
       c.textAlign = 'center'; c.textBaseline = 'alphabetic';
-      c.font = '600 9px "DM Mono", monospace';
+      c.font = '600 9px "Space Mono", monospace';
       c.fillStyle = this.nearJewel ? col : 'rgba(232,224,216,0.5)';
       c.fillText(n.title.toUpperCase(), JEWEL_X, jy - 32);
       if (seen) {
         c.fillStyle = 'rgba(249,219,8,0.7)';
-        c.font = '8px "DM Mono", monospace';
+        c.font = '8px "Space Mono", monospace';
         c.fillText('· found ·', JEWEL_X, jy - 21);
       }
     }
